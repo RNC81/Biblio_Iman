@@ -38,8 +38,10 @@ export default function Home() {
 
     // Si on a tapé qqchose, on lance la requête Full-Text hybride !
     if (searchQuery.trim() !== '') {
+      // Astuce de pro : On remplace les espaces par un joker '%' SQL pour contourner les tirets (ex: Al Kafi -> Al%Kafi)
+      const fuzzyQuery = searchQuery.trim().replace(/\s+/g, '%')
       // On cherche soit dans le titre, soit dans l'auteur, soit par isbn
-      query = query.or(`title.ilike.%${searchQuery}%,author.ilike.%${searchQuery}%,isbn.ilike.%${searchQuery}%`)
+      query = query.or(`title.ilike.%${fuzzyQuery}%,author.ilike.%${fuzzyQuery}%,isbn.ilike.%${fuzzyQuery}%`)
     }
 
     const { data, error } = await query
