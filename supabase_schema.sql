@@ -26,7 +26,8 @@ CREATE TABLE public.books (
   -- Le boolean cliquable pour savoir si le livre est sur l'étagère ou actuellement utilisé par qqn dans l'institut
   is_available boolean DEFAULT true, 
   location_id uuid REFERENCES public.locations(id) ON DELETE SET NULL,
-  created_at timestamp with time zone DEFAULT now() NOT NULL
+  created_at timestamp with time zone DEFAULT now() NOT NULL,
+  private_note text
 );
 
 -- C'est la classique table de liaison Many-to-Many car un bouquin de l'institut peut avoir 3 ou 4 thèmes différents
