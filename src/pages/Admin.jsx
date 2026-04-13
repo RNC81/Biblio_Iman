@@ -22,6 +22,14 @@ const ConfirmModal = ({ isOpen, title, message, onConfirm, onCancel }) => {
   )
 }
 
+// Statuts disponibles pour les exemplaires 
+const COPY_STATUSES = [
+  { value: 'AVAILABLE', label: 'Disponible', color: 'bg-emerald-600 text-white' },
+  { value: 'BORROWED', label: 'Emprunté', color: 'bg-slate-600 text-white' },
+  { value: 'DAMAGED', label: 'Endommagé', color: 'bg-amber-600 text-white' },
+  { value: 'LOST', label: 'Perdu', color: 'bg-rose-600 text-white' },
+]
+
 export default function Admin() {
   const [isbn, setIsbn] = useState('')
   const [loading, setLoading] = useState(false)
@@ -50,20 +58,34 @@ export default function Admin() {
   // Modals States pour Suppression 
   const [bookToDelete, setBookToDelete] = useState(null)
   const [catToDelete, setCatToDelete] = useState(null)
+  const [collectionToDelete, setCollectionToDelete] = useState(null)
 
   const [showCatManager, setShowCatManager] = useState(false)
   const [newCatName, setNewCatName] = useState('')
   const [newCatParentId, setNewCatParentId] = useState('')
 
+  // === COLLECTIONS ===
+  const [dbCollections, setDbCollections] = useState([])
+  const [selectedCollectionId, setSelectedCollectionId] = useState('')
+  const [volumeNumber, setVolumeNumber] = useState('')
+  const [showCollectionManager, setShowCollectionManager] = useState(false)
+  const [newCollectionName, setNewCollectionName] = useState('')
+  const [newCollectionDesc, setNewCollectionDesc] = useState('')
+
+  // === EXEMPLAIRES (Copies) ===
+  const [bookCopies, setBookCopies] = useState([])  // Copies pour le livre en cours d'édition
+  const [showCopiesPanel, setShowCopiesPanel] = useState(false)
+
   useEffect(() => {
     fetchInventory()
     fetchCategories()
+    fetchCollections()
   }, [])
 
   const fetchInventory = async () => {
     const { data, error } = await supabase
       .from('books')
-      .select('*, locations(shelf), book_categories(category_id, categories(id, name, parent_id))')
+      .select('*, locations(shelf), book_categories(category_id, categories(id, name, parent_id)), collections(id, name), book_copies(id, copy_number, status, private_note, location_id, locations(shelf))')
       .order('created_at', { ascending: false })
       
     if (!error && data) setAllBooks(data)
@@ -72,6 +94,21 @@ export default function Admin() {
   const fetchCategories = async () => {
     const { data } = await supabase.from('categories').select('*').order('name')
     if (data) setDbCategories(data)
+  }
+
+  const fetchCollections = async () => {
+    const { data } = await supabase.from('collections').select('*').order('name')
+    if (data) setDbCollections(data)
+  }
+
+  // Charger les exemplaires d'un livre
+  const fetchCopiesForBook = async (bookId) => {
+    const { data } = await supabase
+      .from('book_copies')
+      .select('*, locations(shelf)')
+      .eq('book_id', bookId)
+      .order('copy_number')
+    if (data) setBookCopies(data)
   }
 
   const handleCreateCategory = async () => {
@@ -105,6 +142,74 @@ export default function Admin() {
 
   const toggleCategorySelection = (catId) => {
     setSelectedCatIds(prev => prev.includes(catId) ? prev.filter(id => id !== catId) : [...prev, catId])
+  }
+
+  // === COLLECTIONS CRUD ===
+  const handleCreateCollection = async () => {
+    if (!newCollectionName.trim()) return;
+    const exists = dbCollections.find(c => c.name.toLowerCase() === newCollectionName.trim().toLowerCase())
+    if (exists) {
+      showToastMsg("Cette collection existe déjà.", "error")
+      return;
+    }
+    const { error } = await supabase.from('collections').insert([{ 
+      name: newCollectionName.trim(), 
+      description: newCollectionDesc.trim() || null 
+    }])
+    if (!error) {
+      showToastMsg(`Collection "${newCollectionName}" créée.`, "success")
+      setNewCollectionName('')
+      setNewCollectionDesc('')
+      fetchCollections()
+    } else showToastMsg("Erreur lors de la création.", "error")
+  }
+
+  const confirmDeleteCollection = async () => {
+    if (!collectionToDelete) return
+    const { error } = await supabase.from('collections').delete().eq('id', collectionToDelete.id)
+    if (!error) {
+      showToastMsg("Collection supprimée.", "success")
+      fetchCollections()
+      fetchInventory()
+    }
+    setCollectionToDelete(null)
+  }
+
+  // === EXEMPLAIRES CRUD ===
+  const handleAddCopy = async (bookId) => {
+    const maxNum = bookCopies.length > 0 ? Math.max(...bookCopies.map(c => c.copy_number)) : 0
+    const { error } = await supabase.from('book_copies').insert([{
+      book_id: bookId,
+      copy_number: maxNum + 1,
+      status: 'AVAILABLE'
+    }])
+    if (!error) {
+      showToastMsg(`Exemplaire n°${maxNum + 1} ajouté.`, "success")
+      fetchCopiesForBook(bookId)
+      fetchInventory()
+    } else showToastMsg("Erreur lors de l'ajout de l'exemplaire.", "error")
+  }
+
+  const handleUpdateCopyStatus = async (copyId, newStatus, bookId) => {
+    const { error } = await supabase.from('book_copies').update({ status: newStatus }).eq('id', copyId)
+    if (!error) {
+      fetchCopiesForBook(bookId)
+      fetchInventory()
+    }
+  }
+
+  const handleUpdateCopyNote = async (copyId, note, bookId) => {
+    await supabase.from('book_copies').update({ private_note: note }).eq('id', copyId)
+    fetchCopiesForBook(bookId)
+  }
+
+  const handleDeleteCopy = async (copyId, bookId) => {
+    const { error } = await supabase.from('book_copies').delete().eq('id', copyId)
+    if (!error) {
+      showToastMsg("Exemplaire retiré.", "success")
+      fetchCopiesForBook(bookId)
+      fetchInventory()
+    }
   }
 
   const searchOpenLibrary = async () => {
@@ -188,7 +293,9 @@ export default function Admin() {
         language: bookData.language,
         published_date: bookData.published_date,
         online_url: bookData.online_url || null,
-        cover_url: finalCoverUrl
+        cover_url: finalCoverUrl,
+        collection_id: selectedCollectionId || null,
+        volume_number: volumeNumber ? parseInt(volumeNumber) : null
       }
 
       if (editingId) {
@@ -198,6 +305,15 @@ export default function Admin() {
         const { data: newBook, error } = await supabase.from('books').insert([bp]).select().single()
         if (error) throw error
         finalBookId = newBook.id;
+        // Auto-créer 1 exemplaire pour les livres physiques
+        if (bookData.status !== 'ONLINE') {
+          await supabase.from('book_copies').insert([{
+            book_id: finalBookId,
+            copy_number: 1,
+            status: 'AVAILABLE',
+            location_id: finalLocationId
+          }])
+        }
       }
 
       if (finalBookId) {
@@ -230,6 +346,10 @@ export default function Admin() {
     setSelectedCatIds([])
     setShowCatManager(false)
     setEditingId(null)
+    setSelectedCollectionId('')
+    setVolumeNumber('')
+    setBookCopies([])
+    setShowCopiesPanel(false)
   }
 
   const handleEditClick = (book) => {
@@ -243,6 +363,10 @@ export default function Admin() {
     setCoverPreview(book.cover_url || null)
     setCoverFile(null)
     setShowCatManager(false)
+    setShowCollectionManager(false)
+
+    setSelectedCollectionId(book.collection_id || '')
+    setVolumeNumber(book.volume_number ? book.volume_number.toString() : '')
 
     setBookData({
       title: book.title, 
@@ -255,6 +379,11 @@ export default function Admin() {
       published_date: book.published_date || '',
       online_url: book.online_url || ''
     })
+
+    // Charger les exemplaires
+    fetchCopiesForBook(book.id)
+    setShowCopiesPanel(false)
+
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
@@ -286,6 +415,19 @@ export default function Admin() {
     return <Badge className="bg-emerald-500">AVAILABLE</Badge> 
   }
 
+  const getCopyStatusBadge = (status) => {
+    const s = COPY_STATUSES.find(cs => cs.value === status)
+    return s ? <Badge className={`${s.color} shadow-sm font-bold tracking-widest uppercase text-[9px]`}>{s.label}</Badge> : null
+  }
+
+  // Calculer le résumé des exemplaires pour un livre
+  const getCopiesSummary = (book) => {
+    if (!book.book_copies || book.book_copies.length === 0) return null;
+    const total = book.book_copies.length;
+    const available = book.book_copies.filter(c => c.status === 'AVAILABLE').length;
+    return { total, available }
+  }
+
   return (
     <div className="space-y-10 animate-in fade-in duration-500 pb-20">
       
@@ -304,6 +446,14 @@ export default function Admin() {
          message={`Êtes-vous sûr de vouloir supprimer l'ouvrage "${bookToDelete?.title}" de votre catalogue ? Cette action est irréversible.`}
          onCancel={() => setBookToDelete(null)}
          onConfirm={confirmDeleteBook}
+      />
+
+      <ConfirmModal 
+         isOpen={!!collectionToDelete}
+         title="Supprimer la collection"
+         message={`Êtes-vous sûr de vouloir supprimer la collection "${collectionToDelete?.name}" ? Les livres ne seront pas supprimés, mais ne seront plus regroupés.`}
+         onCancel={() => setCollectionToDelete(null)}
+         onConfirm={confirmDeleteCollection}
       />
 
       {/* Notification discrète pour les succès */}
@@ -418,6 +568,74 @@ export default function Admin() {
                    )}
                 </div>
 
+                {/* === COLLECTION / SÉRIE === */}
+                <div className="space-y-3 p-3 rounded-xl border-2 border-violet-200 bg-violet-50/30 shadow-sm">
+                  <label className="text-[10px] font-black text-violet-600 uppercase tracking-widest flex items-center">
+                    <span className="text-base mr-2">📁</span>
+                    Collection / Série (optionnel)
+                  </label>
+                  <p className="text-[11px] text-slate-500 -mt-1">Regrouper ce livre avec d'autres volumes (ex: Al-Kafi Volume 1, 2, 3...)</p>
+
+                  <div className="grid grid-cols-[1fr_80px] gap-2">
+                    <select 
+                      value={selectedCollectionId} 
+                      onChange={e => setSelectedCollectionId(e.target.value)}
+                      className="w-full text-xs h-9 bg-white border border-violet-200 rounded-md font-semibold text-slate-700 p-2 cursor-pointer outline-none focus:ring-2 focus:ring-violet-300"
+                    >
+                      <option value="">-- Aucune collection --</option>
+                      {dbCollections.map(c => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                    <div className="space-y-0.5">
+                      <Input 
+                        type="number" min="1"
+                        value={volumeNumber} 
+                        onChange={e => setVolumeNumber(e.target.value)} 
+                        placeholder="Vol."
+                        className="bg-white text-xs h-9 border-violet-200 text-center font-bold"
+                      />
+                    </div>
+                  </div>
+
+                  <Button 
+                    variant="ghost" size="sm" 
+                    onClick={() => setShowCollectionManager(!showCollectionManager)} 
+                    className="text-[10px] font-bold text-violet-600 bg-violet-100 hover:bg-violet-200 hover:text-violet-800 transition-all uppercase tracking-widest w-full"
+                  >
+                    {showCollectionManager ? "Fermer le gestionnaire" : "Gérer les collections"}
+                  </Button>
+
+                  {showCollectionManager && (
+                    <div className="mt-2 p-4 bg-white border border-violet-200 shadow-md rounded-xl space-y-4 animate-in fade-in slide-in-from-top-2">
+                      <div className="space-y-3 pb-4 border-b border-slate-100">
+                        <p className="text-xs font-bold text-slate-800">Créer une nouvelle collection</p>
+                        <Input placeholder='Nom (ex: "Al-Kafi", "Nahj al-Balagha")' value={newCollectionName} onChange={e => setNewCollectionName(e.target.value)} className="h-9 text-xs" />
+                        <Input placeholder="Description courte (optionnel)" value={newCollectionDesc} onChange={e => setNewCollectionDesc(e.target.value)} className="h-9 text-xs" />
+                        <Button onClick={handleCreateCollection} disabled={!newCollectionName} size="sm" className="w-full h-9 bg-violet-700 hover:bg-violet-800 text-white font-bold">Enregistrer la collection</Button>
+                      </div>
+                      <div className="space-y-2">
+                        <p className="text-xs font-bold text-slate-800">Collections existantes :</p>
+                        <div className="space-y-2 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
+                          {dbCollections.length === 0 ? (
+                            <p className="text-[11px] text-slate-400 p-2">Aucune collection créée pour le moment.</p>
+                          ) : (
+                            dbCollections.map(col => (
+                              <div key={col.id} className="flex justify-between items-center bg-violet-50 border border-violet-200 rounded-lg p-2.5">
+                                <div>
+                                  <span className="text-sm font-bold text-slate-700">{col.name}</span>
+                                  {col.description && <p className="text-[10px] text-slate-500 mt-0.5">{col.description}</p>}
+                                </div>
+                                <Button onClick={() => setCollectionToDelete(col)} variant="ghost" className="h-6 px-2 text-rose-500 hover:bg-rose-100 hover:text-rose-700 text-xs">Supprimer</Button>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 {/* CATEGORIES RENDUES "HUMAN-FRIENDLY" */}
                 <div className="space-y-3 pt-4 border-t border-slate-100">
                   <div className="flex space-x-2 items-center mb-4 border border-slate-200 bg-slate-50 rounded-lg p-1.5 shadow-inner">
@@ -528,6 +746,78 @@ export default function Admin() {
                     placeholder="Ex: Emprunté par M. Dupont le 12 Mars (Invisible pour les visiteurs)"
                   />
                 </div>
+
+                {/* === GESTION DES EXEMPLAIRES (visible uniquement en édition, pour livres physiques) === */}
+                {editingId && bookData.status !== 'ONLINE' && (
+                  <div className="space-y-3 p-3 rounded-xl border-2 border-teal-200 bg-teal-50/30 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] font-black text-teal-700 uppercase tracking-widest flex items-center">
+                        <span className="text-base mr-2">📦</span>
+                        Exemplaires physiques
+                        <Badge className="ml-2 bg-teal-600 text-white text-[9px] font-bold">{bookCopies.length}</Badge>
+                      </label>
+                      <Button 
+                        size="sm" 
+                        onClick={() => setShowCopiesPanel(!showCopiesPanel)}
+                        className="text-[10px] bg-teal-600 hover:bg-teal-700 text-white font-bold uppercase tracking-widest h-7 px-3"
+                      >
+                        {showCopiesPanel ? "Masquer" : "Gérer"}
+                      </Button>
+                    </div>
+
+                    {showCopiesPanel && (
+                      <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
+                        {bookCopies.map(copy => (
+                          <div key={copy.id} className="bg-white border border-teal-200 rounded-xl p-3 space-y-2 shadow-sm">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-black text-teal-800 bg-teal-100 px-2.5 py-1 rounded-lg">
+                                  Exemplaire n°{copy.copy_number}
+                                </span>
+                                {getCopyStatusBadge(copy.status)}
+                              </div>
+                              <Button 
+                                variant="ghost" size="sm"
+                                onClick={() => handleDeleteCopy(copy.id, editingId)} 
+                                className="h-6 px-2 text-rose-500 hover:bg-rose-100 hover:text-rose-700 text-[10px]"
+                              >
+                                Retirer
+                              </Button>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              <select 
+                                value={copy.status} 
+                                onChange={e => handleUpdateCopyStatus(copy.id, e.target.value, editingId)}
+                                className="text-xs h-8 bg-slate-50 border border-slate-200 rounded-md font-semibold text-slate-700 p-1.5 cursor-pointer outline-none"
+                              >
+                                {COPY_STATUSES.map(s => (
+                                  <option key={s.value} value={s.value}>{s.label}</option>
+                                ))}
+                              </select>
+                              <Input 
+                                value={copy.private_note || ''} 
+                                onChange={e => handleUpdateCopyNote(copy.id, e.target.value, editingId)}
+                                placeholder="Note (ex: emprunté par...)"
+                                className="text-xs h-8 bg-slate-50 border-slate-200"
+                              />
+                            </div>
+                            {copy.locations && (
+                              <p className="text-[10px] text-slate-400 font-medium">📍 {copy.locations.shelf}</p>
+                            )}
+                          </div>
+                        ))}
+
+                        <Button 
+                          onClick={() => handleAddCopy(editingId)} 
+                          variant="outline"
+                          className="w-full h-9 border-teal-300 text-teal-700 hover:bg-teal-100 font-bold text-xs border-dashed"
+                        >
+                          + Ajouter un nouvel exemplaire
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </CardContent>
             
@@ -568,7 +858,9 @@ export default function Admin() {
                  <p className="text-sm mt-1">Commencez par ajouter votre premier livre dans le panneau gauche.</p>
                </div>
             ) : (
-              allBooks.map(book => (
+              allBooks.map(book => {
+                const copiesSummary = getCopiesSummary(book)
+                return (
                 <Card key={book.id} className="shadow-sm border border-slate-200 hover:shadow-md transition-all flex flex-col overflow-hidden bg-white">
                   <div className="h-40 w-full bg-slate-50 flex items-center justify-center relative border-b border-slate-100">
                     {book.cover_url ? (
@@ -578,8 +870,13 @@ export default function Admin() {
                         <span className="text-3xl mb-1">📘</span>
                       </div>
                     )}
-                    <div className="absolute top-2 left-2">
+                    <div className="absolute top-2 left-2 flex flex-col gap-1">
                        {getStatusBadge(book.status)}
+                       {book.collections && (
+                         <Badge className="bg-violet-600 shadow-sm text-white font-bold tracking-widest uppercase text-[9px]">
+                           📁 {book.collections.name}{book.volume_number ? ` · Vol.${book.volume_number}` : ''}
+                         </Badge>
+                       )}
                     </div>
                   </div>
                   
@@ -589,6 +886,15 @@ export default function Admin() {
                       <CardDescription className="text-xs truncate font-medium text-slate-500">{book.author || "Auteur inconnu"}</CardDescription>
                       <span className="text-[10px] text-slate-500 font-bold bg-slate-100 px-1.5 py-0.5 rounded">{book.published_date || "-"}</span>
                     </div>
+
+                    {/* Exemplaires résumé */}
+                    {copiesSummary && (
+                      <div className="mt-2 flex items-center gap-1.5">
+                        <Badge variant="outline" className={`text-[9px] font-bold border-2 ${copiesSummary.available > 0 ? 'border-teal-300 bg-teal-50 text-teal-700' : 'border-slate-300 bg-slate-50 text-slate-500'}`}>
+                          📦 {copiesSummary.available}/{copiesSummary.total} exemplaire{copiesSummary.total > 1 ? 's' : ''} disponible{copiesSummary.available > 1 ? 's' : ''}
+                        </Badge>
+                      </div>
+                    )}
                     
                     <div className="flex flex-wrap gap-1 mt-3 pt-3 border-t border-slate-50">
                        {book.language && <Badge variant="outline" className="text-[9px] font-bold bg-white text-slate-500">{book.language}</Badge>}
@@ -626,7 +932,8 @@ export default function Admin() {
                     </Button>
                   </CardFooter>
                 </Card>
-              ))
+                )
+              })
             )}
           </div>
         </div>

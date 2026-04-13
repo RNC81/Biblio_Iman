@@ -17,6 +17,10 @@ export default function Home() {
   const [selectedStatus, setSelectedStatus] = useState(null)
   const [selectedCat, setSelectedCat] = useState(null)
   const [selectedAuthor, setSelectedAuthor] = useState(null)
+  const [selectedCollection, setSelectedCollection] = useState(null)
+  
+  // State pour ouvrir/fermer les dossiers de collection
+  const [openCollections, setOpenCollections] = useState({})
   
   const debouncedSearchTerm = useDebounce(searchTerm, 300)
 
@@ -28,7 +32,7 @@ export default function Home() {
     setLoading(true)
     const { data, error } = await supabase
       .from('books')
-      .select('*, locations(shelf), book_categories(categories(id, name, parent_id))')
+      .select('*, locations(shelf), book_categories(categories(id, name, parent_id)), collections(id, name), book_copies(id, copy_number, status)')
       .order('created_at', { ascending: false })
       
     if (!error && data) {
@@ -74,9 +78,12 @@ export default function Home() {
          return b.book_categories.some(bc => bc.categories?.name === selectedCat)
       })
     }
+    if (selectedCollection) {
+      result = result.filter(b => b.collections?.name === selectedCollection)
+    }
 
     setFilteredBooks(result)
-  }, [debouncedSearchTerm, books, selectedLanguage, selectedStatus, selectedCat, selectedAuthor])
+  }, [debouncedSearchTerm, books, selectedLanguage, selectedStatus, selectedCat, selectedAuthor, selectedCollection])
 
   // Génération automatique des choix de la barre latérale 
   // Langues par défaut garanties pour la vue, plus celles trouvées 
@@ -96,6 +103,46 @@ export default function Home() {
   })
   const availableCategories = [...new Set(allCatNames)].sort()
 
+  // Collections disponibles
+  const availableCollections = [...new Set(books.map(b => b.collections?.name).filter(Boolean))].sort()
+
+  // Grouper les livres filtrés par collection pour l'affichage
+  const getGroupedBooks = () => {
+    const collections = {}
+    const standalone = []
+
+    filteredBooks.forEach(book => {
+      if (book.collections) {
+        const colName = book.collections.name
+        if (!collections[colName]) {
+          collections[colName] = { id: book.collections.id, name: colName, books: [] }
+        }
+        collections[colName].books.push(book)
+      } else {
+        standalone.push(book)
+      }
+    })
+
+    // Trier les volumes dans chaque collection
+    Object.values(collections).forEach(col => {
+      col.books.sort((a, b) => (a.volume_number || 999) - (b.volume_number || 999))
+    })
+
+    return { collections: Object.values(collections), standalone }
+  }
+
+  const toggleCollection = (colName) => {
+    setOpenCollections(prev => ({ ...prev, [colName]: !prev[colName] }))
+  }
+
+  // Calculer le résumé des exemplaires pour un livre
+  const getCopiesSummary = (book) => {
+    if (!book.book_copies || book.book_copies.length === 0) return null;
+    const total = book.book_copies.length;
+    const available = book.book_copies.filter(c => c.status === 'AVAILABLE').length;
+    return { total, available }
+  }
+
   // Petite aide visuelle qui affiche la hiérarchie Catégorie Parent > Enfant
   // On l'adapte ici si besoin, bien que le Home ne charge pas toute la table catégories, 
   // on utilise simplement les noms directs extraits.
@@ -106,6 +153,150 @@ export default function Home() {
     if (status === 'ONLINE') return <Badge className="bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-[10px] px-3 py-1 shadow pointer-events-none">RESSOURCE EN LIGNE (WEB)</Badge>
     return null
   }
+
+  const CopiesBadge = ({ book }) => {
+    const summary = getCopiesSummary(book)
+    if (!summary) return null
+    return (
+      <div className="flex items-center gap-1 mt-1">
+        <Badge variant="outline" className={`text-[9px] font-bold border ${summary.available > 0 ? 'border-teal-300 bg-teal-50 text-teal-700' : 'border-slate-300 bg-slate-50 text-slate-500'}`}>
+          {summary.available}/{summary.total} exemplaire{summary.total > 1 ? 's' : ''} disponible{summary.available > 1 ? 's' : ''}
+        </Badge>
+      </div>
+    )
+  }
+
+  const BookCard = ({ book }) => (
+    <Card className="group overflow-hidden border border-slate-200 shadow-sm hover:shadow-xl transition-all duration-300 bg-white rounded-3xl flex flex-col hover:-translate-y-1">
+       
+       {/* IMAGE COUVERTURE */}
+       <div className="h-60 bg-slate-50 flex items-center justify-center overflow-hidden relative border-b border-black/5">
+           {book.cover_url ? (
+              <img src={book.cover_url} alt={book.title} className="object-cover w-full h-full opacity-90 group-hover:scale-105 group-hover:opacity-100 transition-all duration-500" />
+            ) : (
+              <div className="flex flex-col items-center opacity-30 group-hover:opacity-50 transition-opacity">
+                <span className="text-6xl mb-2 grayscale">📓</span>
+              </div>
+            )}
+
+           <div className="absolute top-4 left-4 z-10 transition-transform group-hover:scale-105 flex flex-col gap-1">
+              <StatusOverlay status={book.status} />
+              {book.volume_number && (
+                <Badge className="bg-violet-600 hover:bg-violet-700 text-white font-extrabold text-[10px] px-3 py-1 shadow pointer-events-none">
+                  Volume {book.volume_number}
+                </Badge>
+              )}
+           </div>
+       </div>
+
+       <CardContent className="p-6 flex-1 flex flex-col justify-between">
+           <div>
+              <div className="flex flex-wrap gap-2 mb-3">
+                 {book.status === 'ONLINE' && <Badge className="bg-blue-50 text-blue-700 hover:bg-blue-100 font-bold tracking-widest border border-blue-200 px-2 py-0.5">FORMAT NUMÉRIQUE</Badge>}
+                 {book.language && <Badge variant="outline" className="font-bold text-slate-500 border-slate-200 px-2 py-0.5">{book.language}</Badge>}
+              </div>
+              <h2 className="text-xl font-bold text-slate-900 line-clamp-2 leading-tight mb-1 group-hover:text-indigo-600 transition-colors" title={book.title}>{book.title}</h2>
+              <p className="text-sm font-semibold text-indigo-600 mb-2">{book.author || "Auteur inconnu"}</p>
+              
+              <CopiesBadge book={book} />
+              
+              <p className="text-slate-600 text-sm line-clamp-3 leading-relaxed mb-4 mt-3">{book.synopsis || "Ce livre ne possède pas encore de résumé enregistré dans notre catalogue."}</p>
+           </div>
+           
+           <div className="space-y-4 mt-auto">
+               <div className="flex flex-wrap gap-1.5 pt-4 border-t border-slate-100">
+                  {book.book_categories && book.book_categories.map(bc => (
+                     <Badge key={bc.categories?.id} variant="secondary" className="bg-slate-100 text-slate-600 hover:bg-slate-200 text-xs font-semibold px-3 py-1 border border-slate-200 cursor-default">{bc.categories?.name}</Badge>
+                  ))}
+               </div>
+               
+               <div className="flex items-center justify-between mt-5 pt-2">
+                  {book.locations ? (
+                     <div className="flex items-center bg-slate-50 rounded-lg px-3 py-1.5 border border-slate-200 shadow-inner">
+                       <span className="text-sm mr-2 text-slate-400">📍</span>
+                       <span className="text-xs font-bold text-slate-600 uppercase">{book.locations.shelf}</span>
+                     </div>
+                  ) : <div></div>}
+
+                  {book.status === 'ONLINE' && book.online_url && (
+                     <a href={book.online_url} target="_blank" rel="noreferrer">
+                       <Button className="h-10 px-6 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md hover:shadow-lg transition-all">Consulter ↗</Button>
+                     </a>
+                  )}
+               </div>
+           </div>
+       </CardContent>
+    </Card>
+  )
+
+  // Carte "Dossier" de Collection
+  const CollectionFolder = ({ collection }) => {
+    const isOpen = openCollections[collection.name]
+    const totalBooks = collection.books.length
+    const totalCopiesAvailable = collection.books.reduce((acc, book) => {
+      const summary = getCopiesSummary(book)
+      return acc + (summary ? summary.available : 0)
+    }, 0)
+    const totalCopies = collection.books.reduce((acc, book) => {
+      const summary = getCopiesSummary(book)
+      return acc + (summary ? summary.total : 0)
+    }, 0)
+
+    // Prendre la cover du premier livre comme aperçu
+    const previewCover = collection.books.find(b => b.cover_url)?.cover_url
+
+    return (
+      <div className="col-span-full">
+        {/* En-tête du dossier */}
+        <div 
+          onClick={() => toggleCollection(collection.name)}
+          className={`cursor-pointer group border-2 rounded-2xl transition-all duration-300 overflow-hidden ${isOpen ? 'border-violet-300 bg-violet-50/50 shadow-lg' : 'border-slate-200 bg-white hover:border-violet-200 hover:shadow-md shadow-sm'}`}
+        >
+          <div className="flex items-center gap-5 p-5">
+            {/* Icône dossier / aperçu */}
+            <div className={`w-16 h-20 rounded-xl flex items-center justify-center overflow-hidden flex-shrink-0 transition-all border ${isOpen ? 'border-violet-300 bg-violet-100' : 'border-slate-200 bg-slate-50'}`}>
+              {previewCover ? (
+                <img src={previewCover} alt="" className="object-cover w-full h-full rounded-xl opacity-80" />
+              ) : (
+                <span className="text-3xl">📁</span>
+              )}
+            </div>
+
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-3 mb-1">
+                <h3 className="text-lg font-extrabold text-slate-900 truncate group-hover:text-violet-700 transition-colors">{collection.name}</h3>
+                <Badge className="bg-violet-600 text-white font-bold text-[10px] shadow-sm flex-shrink-0">
+                  {totalBooks} volume{totalBooks > 1 ? 's' : ''}
+                </Badge>
+              </div>
+              <p className="text-sm text-slate-500 font-medium">
+                Collection complète · {totalCopies > 0 ? `${totalCopiesAvailable}/${totalCopies} exemplaires disponibles` : 'Ressources numériques'}
+              </p>
+            </div>
+
+            <div className={`text-slate-400 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="m6 9 6 6 6-6"/>
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        {/* Contenu du dossier (les volumes) */}
+        {isOpen && (
+          <div className="mt-4 pl-4 border-l-4 border-violet-200 animate-in fade-in slide-in-from-top-3 duration-300">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6 lg:gap-8">
+              {collection.books.map(book => (
+                <BookCard key={book.id} book={book} />
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  const { collections: groupedCollections, standalone: standaloneBooks } = loading ? { collections: [], standalone: [] } : getGroupedBooks()
 
   return (
     <div className="min-h-screen bg-[#fcfcfc] border-t border-slate-200">
@@ -140,6 +331,23 @@ export default function Home() {
                    Ouvrages Numériques
                 </div>
               </div>
+
+              {/* Collections */}
+              {availableCollections.length > 0 && (
+                <div className="space-y-3 mb-8">
+                  <p className="text-xs font-bold text-slate-800 border-b border-slate-100 pb-2 mb-3">Collections / Séries</p>
+                  <div onClick={()=>setSelectedCollection(null)} className={`text-sm cursor-pointer transition-all flex items-center group ${!selectedCollection ? 'font-bold text-indigo-700' : 'text-slate-600 hover:text-slate-900'}`}>
+                     <span className={`w-1.5 h-1.5 rounded-full mr-3 ${!selectedCollection ? 'bg-indigo-600' : 'bg-slate-200 group-hover:bg-slate-400'}`}></span>
+                     Toutes
+                  </div>
+                  {availableCollections.map(col => (
+                     <div key={col} onClick={()=>setSelectedCollection(col)} className={`text-sm flex items-center cursor-pointer transition-all group ${selectedCollection === col ? 'font-bold text-violet-700' : 'text-slate-600 hover:text-slate-900'}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full mr-3 ${selectedCollection === col ? 'bg-violet-600' : 'bg-slate-200 group-hover:bg-slate-400'}`}></span>
+                        📁 {col}
+                     </div>
+                  ))}
+                </div>
+              )}
 
               {/* Langues */}
               <div className="space-y-3 mb-8">
@@ -225,7 +433,7 @@ export default function Home() {
                   <span className="text-5xl opacity-40 mb-4">📚</span>
                   <p className="text-slate-700 font-bold text-lg mb-1">Aucun livre ne correspond à votre recherche.</p>
                   <p className="text-slate-500 font-medium">Vous pouvez réessayer avec d'autres mots-clés ou désactiver certains filtres.</p>
-                  <Button onClick={() => {setSearchTerm(''); setSelectedCat(null); setSelectedLanguage(null); setSelectedStatus(null); setSelectedAuthor(null)}} variant="outline" className="mt-6 border-indigo-200 text-indigo-700 bg-indigo-50 font-bold hover:bg-indigo-600 hover:text-white rounded-xl transition-all">Afficher tous les livres</Button>
+                  <Button onClick={() => {setSearchTerm(''); setSelectedCat(null); setSelectedLanguage(null); setSelectedStatus(null); setSelectedAuthor(null); setSelectedCollection(null)}} variant="outline" className="mt-6 border-indigo-200 text-indigo-700 bg-indigo-50 font-bold hover:bg-indigo-600 hover:text-white rounded-xl transition-all">Afficher tous les livres</Button>
                </div>
             ) : (
               <div>
@@ -233,62 +441,24 @@ export default function Home() {
                   {filteredBooks.length} LIVRE{filteredBooks.length > 1 ? 'S' : ''} DANS LE CATALOGUE
                 </p>
                 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6 lg:gap-8">
-                  {filteredBooks.map(book => (
-                    <Card key={book.id} className="group overflow-hidden border border-slate-200 shadow-sm hover:shadow-xl transition-all duration-300 bg-white rounded-3xl flex flex-col hover:-translate-y-1">
-                       
-                       {/* IMAGE COUVERTURE */}
-                       <div className="h-60 bg-slate-50 flex items-center justify-center overflow-hidden relative border-b border-black/5">
-                           {book.cover_url ? (
-                              <img src={book.cover_url} alt={book.title} className="object-cover w-full h-full opacity-90 group-hover:scale-105 group-hover:opacity-100 transition-all duration-500" />
-                            ) : (
-                              <div className="flex flex-col items-center opacity-30 group-hover:opacity-50 transition-opacity">
-                                <span className="text-6xl mb-2 grayscale">📓</span>
-                              </div>
-                            )}
+                <div className="space-y-8">
+                  {/* Collections groupées (dossiers) */}
+                  {groupedCollections.length > 0 && (
+                    <div className="space-y-4">
+                      {groupedCollections.map(col => (
+                        <CollectionFolder key={col.id} collection={col} />
+                      ))}
+                    </div>
+                  )}
 
-                           <div className="absolute top-4 left-4 z-10 transition-transform group-hover:scale-105">
-                              <StatusOverlay status={book.status} />
-                           </div>
-                       </div>
-
-                       <CardContent className="p-6 flex-1 flex flex-col justify-between">
-                           <div>
-                              <div className="flex flex-wrap gap-2 mb-3">
-                                 {book.status === 'ONLINE' && <Badge className="bg-blue-50 text-blue-700 hover:bg-blue-100 font-bold tracking-widest border border-blue-200 px-2 py-0.5">FORMAT NUMÉRIQUE</Badge>}
-                                 {book.language && <Badge variant="outline" className="font-bold text-slate-500 border-slate-200 px-2 py-0.5">{book.language}</Badge>}
-                              </div>
-                              <h2 className="text-xl font-bold text-slate-900 line-clamp-2 leading-tight mb-1 group-hover:text-indigo-600 transition-colors" title={book.title}>{book.title}</h2>
-                              <p className="text-sm font-semibold text-indigo-600 mb-4">{book.author || "Auteur inconnu"}</p>
-                              
-                              <p className="text-slate-600 text-sm line-clamp-3 leading-relaxed mb-4">{book.synopsis || "Ce livre ne possède pas encore de résumé enregistré dans notre catalogue."}</p>
-                           </div>
-                           
-                           <div className="space-y-4 mt-auto">
-                               <div className="flex flex-wrap gap-1.5 pt-4 border-t border-slate-100">
-                                  {book.book_categories && book.book_categories.map(bc => (
-                                     <Badge key={bc.category_id} variant="secondary" className="bg-slate-100 text-slate-600 hover:bg-slate-200 text-xs font-semibold px-3 py-1 border border-slate-200 cursor-default">{bc.categories?.name}</Badge>
-                                  ))}
-                               </div>
-                               
-                               <div className="flex items-center justify-between mt-5 pt-2">
-                                  {book.locations ? (
-                                     <div className="flex items-center bg-slate-50 rounded-lg px-3 py-1.5 border border-slate-200 shadow-inner">
-                                       <span className="text-sm mr-2 text-slate-400">📍</span>
-                                       <span className="text-xs font-bold text-slate-600 uppercase">{book.locations.shelf}</span>
-                                     </div>
-                                  ) : <div></div>}
-
-                                  {book.status === 'ONLINE' && book.online_url && (
-                                     <a href={book.online_url} target="_blank" rel="noreferrer">
-                                       <Button className="h-10 px-6 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md hover:shadow-lg transition-all">Consulter ↗</Button>
-                                     </a>
-                                  )}
-                               </div>
-                           </div>
-                       </CardContent>
-                    </Card>
-                  ))}
+                  {/* Livres individuels (hors collection) */}
+                  {standaloneBooks.length > 0 && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-6 lg:gap-8">
+                      {standaloneBooks.map(book => (
+                        <BookCard key={book.id} book={book} />
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
