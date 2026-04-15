@@ -212,12 +212,43 @@ export default function Admin() {
     }
   }
 
-  const searchOpenLibrary = async () => {
+  // Recherche intelligente : d'abord en local (ISBN ou UUID), puis OpenLibrary
+  const handleScan = async () => {
     if (!isbn) return
     setLoading(true)
-    const cleanIsbn = isbn.replace(/[- ]/g, '')
+    const cleanCode = isbn.trim().replace(/[- ]/g, '')
+
     try {
-      const res = await fetch(`https://openlibrary.org/search.json?q=${cleanIsbn}`)
+      // 1. Chercher dans le catalogue local par ISBN
+      const { data: localByIsbn } = await supabase
+        .from('books')
+        .select('*, locations(shelf), book_categories(category_id, categories(id, name, parent_id)), collections(id, name), book_copies(id, copy_number, status, private_note, location_id, locations(shelf))')
+        .eq('isbn', cleanCode)
+        .maybeSingle()
+
+      if (localByIsbn) {
+        handleEditClick(localByIsbn)
+        showToastMsg("Livre trouvé dans votre catalogue ! Ouvert en édition.", "success")
+        setLoading(false)
+        return
+      }
+
+      // 2. Chercher dans le catalogue local par UUID (QR code personnalisé)
+      const { data: localById } = await supabase
+        .from('books')
+        .select('*, locations(shelf), book_categories(category_id, categories(id, name, parent_id)), collections(id, name), book_copies(id, copy_number, status, private_note, location_id, locations(shelf))')
+        .eq('id', cleanCode)
+        .maybeSingle()
+
+      if (localById) {
+        handleEditClick(localById)
+        showToastMsg("Livre trouvé dans votre catalogue ! Ouvert en édition.", "success")
+        setLoading(false)
+        return
+      }
+
+      // 3. Si pas trouvé en local → chercher sur OpenLibrary pour pré-remplir
+      const res = await fetch(`https://openlibrary.org/search.json?q=${cleanCode}`)
       const data = await res.json()
       if (data.docs && data.docs.length > 0) {
         const book = data.docs[0]
@@ -228,13 +259,23 @@ export default function Admin() {
           cover_url: book.cover_i ? `https://covers.openlibrary.org/b/id/${book.cover_i}-L.jpg` : '',
           published_date: book.first_publish_year ? book.first_publish_year.toString() : ''
         })
+        showToastMsg("Livre trouvé sur Internet. Vérifiez les informations puis enregistrez.", "success")
       } else {
-        showToastMsg("Aucun livre trouvé avec ce code.", "error")
+        showToastMsg("Aucun livre trouvé. Remplissez les informations manuellement.", "error")
       }
     } catch (e) {
       console.error(e)
+      showToastMsg("Erreur lors de la recherche.", "error")
     }
     setLoading(false)
+  }
+
+  // Gestion de la touche Entrée (envoyée automatiquement par la douchette après un scan)
+  const handleScanKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      handleScan()
+    }
   }
 
   const handleFileChange = (e) => {
@@ -489,12 +530,14 @@ export default function Admin() {
                  <div className="relative group">
                    <Input 
                      type="text" 
-                     placeholder="Scanner un Code-barres ou QR..." 
+                     placeholder="Scannez un code-barres / QR, ou tapez un ISBN..." 
                      className="pl-5 h-12 w-full rounded-xl bg-slate-50 border-slate-200 shadow-inner focus:ring-2 ring-indigo-200 focus:bg-white transition-all font-medium text-slate-700"
                      value={isbn}
                      onChange={(e) => setIsbn(e.target.value)}
+                     onKeyDown={handleScanKeyDown}
+                     autoFocus
                    />
-                   <Button onClick={searchOpenLibrary} disabled={loading} className="absolute right-1 top-1 h-10 px-4 bg-slate-900 hover:bg-slate-800 text-[10px] uppercase font-black tracking-widest rounded-lg">Rechercher</Button>
+                   <Button onClick={handleScan} disabled={loading} className="absolute right-1 top-1 h-10 px-4 bg-slate-900 hover:bg-slate-800 text-[10px] uppercase font-black tracking-widest rounded-lg">Rechercher</Button>
                  </div>
               )}
 
