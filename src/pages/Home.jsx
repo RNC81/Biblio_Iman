@@ -526,7 +526,7 @@ export default function Home() {
       </div>
 
       <Dialog open={!!selectedBookModal} onOpenChange={(open) => !open && setSelectedBookModal(null)}>
-        <DialogContent className="max-w-[90vw] w-[1000px] p-0 overflow-hidden bg-white gap-0 border-none rounded-3xl shadow-2xl">
+        <DialogContent className="sm:max-w-[95vw] md:max-w-[90vw] lg:max-w-[1000px] w-full p-0 overflow-hidden bg-white gap-0 border-none rounded-3xl shadow-2xl">
           {selectedBookModal && (
             <div className="flex flex-col md:flex-row h-[85vh] max-h-[800px] w-full">
                {/* SIDEBAR IMAGE */}
