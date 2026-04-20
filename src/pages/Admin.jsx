@@ -37,8 +37,10 @@ export default function Admin() {
     title: '', author: '', synopsis: '', cover_url: '', 
     status: 'AVAILABLE', private_note: '', 
     language: 'Français', published_date: '', online_url: '',
-    publisher: '', established_by: ''
+    publisher: '', established_by: '', translator: ''
   })
+  
+  const [inventorySearch, setInventorySearch] = useState('')
   
   const [locationText, setLocationText] = useState('')
   const [coverFile, setCoverFile] = useState(null)
@@ -79,6 +81,10 @@ export default function Admin() {
   const languesDeBase = ["Français", "Arabe", "Persan", "Anglais", "Multi-langues"]
   const extractedLangues = [...new Set(allBooks.map(b => b.language).filter(Boolean))]
   const availableLanguages = [...new Set([...languesDeBase, ...extractedLangues])].sort()
+
+  // === TRADUCTIONS ===
+  const [isTranslation, setIsTranslation] = useState(false)
+  const [selectedOriginalBookId, setSelectedOriginalBookId] = useState('')
 
   // === EXEMPLAIRES (Copies) ===
   const [bookCopies, setBookCopies] = useState([])  // Copies pour le livre en cours d'édition
@@ -344,10 +350,12 @@ export default function Admin() {
         published_date: bookData.published_date,
         publisher: bookData.publisher || null,
         established_by: bookData.established_by || null,
+        translator: bookData.translator || null,
         online_url: bookData.online_url || null,
         cover_url: finalCoverUrl,
         collection_id: selectedCollectionId || null,
-        volume_number: volumeNumber ? parseInt(volumeNumber) : null
+        volume_number: volumeNumber ? parseInt(volumeNumber) : null,
+        original_book_id: isTranslation && selectedOriginalBookId ? selectedOriginalBookId : null
       }
 
       if (editingId) {
@@ -390,7 +398,7 @@ export default function Admin() {
       title: '', author: '', synopsis: '', cover_url: '', 
       status: 'AVAILABLE', private_note: '', 
       language: 'Français', published_date: '', online_url: '',
-      publisher: '', established_by: ''
+      publisher: '', established_by: '', translator: ''
     })
     setNewLanguage('')
     setShowNewLangInput(false)
@@ -403,6 +411,8 @@ export default function Admin() {
     setEditingId(null)
     setSelectedCollectionId('')
     setVolumeNumber('')
+    setIsTranslation(false)
+    setSelectedOriginalBookId('')
     setBookCopies([])
     setShowCopiesPanel(false)
   }
@@ -422,6 +432,9 @@ export default function Admin() {
 
     setSelectedCollectionId(book.collection_id || '')
     setVolumeNumber(book.volume_number ? book.volume_number.toString() : '')
+    
+    setIsTranslation(!!book.original_book_id)
+    setSelectedOriginalBookId(book.original_book_id || '')
 
     setBookData({
       title: book.title, 
@@ -434,6 +447,7 @@ export default function Admin() {
       published_date: book.published_date || '',
       publisher: book.publisher || '',
       established_by: book.established_by || '',
+      translator: book.translator || '',
       online_url: book.online_url || ''
     })
     setNewLanguage('')
@@ -619,6 +633,45 @@ export default function Admin() {
                        </div>
                      )}
                   </div>
+                </div>
+
+                {/* === TRADUCTION === */}
+                <div className={`space-y-3 p-3 rounded-xl border-2 transition-all ${isTranslation ? 'border-pink-200 bg-pink-50/30' : 'border-slate-100 bg-slate-50'}`}>
+                  <label className="flex items-center space-x-2 cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      checked={isTranslation} 
+                      onChange={e => {
+                        setIsTranslation(e.target.checked)
+                        if (!e.target.checked) setSelectedOriginalBookId('')
+                      }} 
+                      className="w-4 h-4 text-pink-600 rounded border-slate-300 focus:ring-pink-500"
+                    />
+                    <span className={`text-[11px] font-black uppercase tracking-widest ${isTranslation ? 'text-pink-600' : 'text-slate-500'}`}>
+                      Ce livre est une traduction
+                    </span>
+                  </label>
+                  
+                  {isTranslation && (
+                    <div className="space-y-3 pt-2 border-t border-pink-100 animate-in fade-in slide-in-from-top-1">
+                      <Input 
+                        value={bookData.translator} 
+                        onChange={e => setBookData({...bookData, translator: e.target.value})} 
+                        placeholder="Nom du traducteur" 
+                        className="bg-white border-pink-200 text-xs h-9" 
+                      />
+                      <select 
+                        value={selectedOriginalBookId} 
+                        onChange={e => setSelectedOriginalBookId(e.target.value)}
+                        className="w-full text-xs h-9 bg-white border border-pink-200 rounded-md font-semibold text-slate-700 p-2 cursor-pointer outline-none focus:ring-2 focus:ring-pink-300"
+                      >
+                        <option value="">-- Sélectionner l'oeuvre originale --</option>
+                        {allBooks.filter(b => b.id !== editingId).map(b => (
+                          <option key={b.id} value={b.id}>{b.title} {b.author ? `(${b.author})` : ''}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                 </div>
 
                 {/* UPLOAD SIMPLIFIÉ */}
@@ -935,12 +988,20 @@ export default function Admin() {
         
         {/* COLONNE DROITE : VOTRE CATALOGUE */}
         <div className="space-y-4">
-          <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-200">
-            <h2 className="text-xl font-bold flex items-center text-slate-800">
-              <span className="mr-3">Votre Catalogue</span> 
-              <Badge variant="secondary" className="bg-slate-100 text-slate-700 text-sm shadow-inner">{allBooks.length}</Badge>
-            </h2>
-            <Button onClick={fetchInventory} variant="ghost" size="sm" className="bg-white text-xs font-semibold text-slate-500 border border-slate-200 hover:text-slate-800 shadow-sm">Actualiser</Button>
+          <div className="flex flex-col gap-3 pb-3 mb-4 border-b border-slate-200">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-bold flex items-center text-slate-800">
+                <span className="mr-3">Votre Catalogue</span> 
+                <Badge variant="secondary" className="bg-slate-100 text-slate-700 text-sm shadow-inner">{allBooks.length}</Badge>
+              </h2>
+              <Button onClick={fetchInventory} variant="ghost" size="sm" className="bg-white text-xs font-semibold text-slate-500 border border-slate-200 hover:text-slate-800 shadow-sm">Actualiser</Button>
+            </div>
+            <Input 
+              placeholder="Rechercher par titre, auteur ou ISBN..." 
+              value={inventorySearch} 
+              onChange={e => setInventorySearch(e.target.value)} 
+              className="bg-white shadow-sm border-slate-200" 
+            />
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3">
@@ -951,7 +1012,13 @@ export default function Admin() {
                  <p className="text-sm mt-1">Commencez par ajouter votre premier livre dans le panneau gauche.</p>
                </div>
             ) : (
-              allBooks.map(book => {
+              allBooks.filter(b => {
+                if(!inventorySearch) return true;
+                const q = inventorySearch.toLowerCase();
+                return (b.title && b.title.toLowerCase().includes(q)) || 
+                       (b.author && b.author.toLowerCase().includes(q)) || 
+                       (b.isbn && b.isbn.toLowerCase().includes(q));
+              }).map(book => {
                 const copiesSummary = getCopiesSummary(book)
                 return (
                 <Card key={book.id} className="shadow-sm border border-slate-200 hover:shadow-md transition-all flex flex-col overflow-hidden bg-white">

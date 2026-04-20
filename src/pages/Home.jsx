@@ -143,6 +143,17 @@ export default function Home() {
     return { total, available }
   }
 
+  // Effectuer une redirection fluide vers un autre livre
+  const handleRedirectToBook = (targetTitle) => {
+    setSelectedCollection(null)
+    setSelectedLanguage(null)
+    setSelectedStatus(null)
+    setSelectedAuthor(null)
+    setSelectedCat(null)
+    setSearchTerm(targetTitle)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
   // Petite aide visuelle qui affiche la hiérarchie Catégorie Parent > Enfant
   // On l'adapte ici si besoin, bien que le Home ne charge pas toute la table catégories, 
   // on utilise simplement les noms directs extraits.
@@ -209,10 +220,45 @@ export default function Home() {
               <CopiesBadge book={book} />
               
               <p className="text-slate-600 text-sm line-clamp-3 leading-relaxed mb-4 mt-3">{book.synopsis || "Ce livre ne possède pas encore de résumé enregistré dans notre catalogue."}</p>
+              
+              {/* LIENS DE TRADUCTION */}
+              {(() => {
+                const originalBook = book.original_book_id ? books.find(b => b.id === book.original_book_id) : null;
+                const availableTranslations = books.filter(b => b.original_book_id === book.id);
+                
+                if (!originalBook && availableTranslations.length === 0 && !book.translator) return null;
+                
+                return (
+                  <div className="space-y-2 mt-4 pt-3 border-t border-slate-100/60">
+                    {book.translator && (
+                       <p className="text-[11px] font-bold text-pink-600/80 mb-1">Traduit par : <span className="text-pink-600">{book.translator}</span></p>
+                    )}
+                    {originalBook && (
+                       <Button 
+                         variant="outline" 
+                         onClick={() => handleRedirectToBook(originalBook.title)}
+                         className="w-full justify-start h-8 px-3 text-[10px] font-bold border-pink-200 text-pink-700 bg-pink-50 hover:bg-pink-100 hover:text-pink-800 uppercase tracking-wide"
+                       >
+                         🔗 Voir l'original ({originalBook.language || 'Autre'})
+                       </Button>
+                    )}
+                    {availableTranslations.length > 0 && availableTranslations.map(tr => (
+                       <Button 
+                         key={tr.id}
+                         variant="outline" 
+                         onClick={() => handleRedirectToBook(tr.title)}
+                         className="w-full justify-start h-8 px-3 text-[10px] font-bold border-indigo-200 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 hover:text-indigo-800 uppercase tracking-wide"
+                       >
+                         🔗 Voir traduction en {tr.language || 'Autre'}
+                       </Button>
+                    ))}
+                  </div>
+                );
+              })()}
            </div>
            
-           <div className="space-y-4 mt-auto">
-               <div className="flex flex-wrap gap-1.5 pt-4 border-t border-slate-100">
+           <div className="space-y-4 mt-auto pt-4">
+               <div className="flex flex-wrap gap-1.5 border-t border-slate-100 pt-4">
                   {book.book_categories && book.book_categories.map(bc => (
                      <Badge key={bc.categories?.id} variant="secondary" className="bg-slate-100 text-slate-600 hover:bg-slate-200 text-xs font-semibold px-3 py-1 border border-slate-200 cursor-default">{bc.categories?.name}</Badge>
                   ))}

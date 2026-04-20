@@ -25,6 +25,7 @@ CREATE TABLE public.books (
   author text NOT NULL,
   publisher text,
   established_by text,
+  translator text,
   isbn text,
   synopsis text,
   cover_url text,
@@ -36,6 +37,7 @@ CREATE TABLE public.books (
   private_note text,
   collection_id uuid REFERENCES public.collections(id) ON DELETE SET NULL,
   volume_number integer,
+  original_book_id uuid REFERENCES public.books(id) ON DELETE SET NULL,
   created_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
