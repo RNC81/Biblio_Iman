@@ -196,7 +196,15 @@ export default function Home() {
                  {book.language && <Badge variant="outline" className="font-bold text-slate-500 border-slate-200 px-2 py-0.5">{book.language}</Badge>}
               </div>
               <h2 className="text-xl font-bold text-slate-900 line-clamp-2 leading-tight mb-1 group-hover:text-indigo-600 transition-colors" title={book.title}>{book.title}</h2>
-              <p className="text-sm font-semibold text-indigo-600 mb-2">{book.author || "Auteur inconnu"}</p>
+              <p className="text-sm font-semibold text-indigo-600 mb-1.5">{book.author || "Auteur inconnu"}</p>
+              
+              {(book.publisher || book.established_by) && (
+                <div className="flex flex-wrap gap-2 text-[10px] font-bold text-slate-500 mb-3 uppercase tracking-wider">
+                  {book.publisher && <span className="bg-slate-100 px-2 py-1 rounded-md">🏢 {book.publisher}</span>}
+                  {book.established_by && <span className="bg-slate-100 px-2 py-1 rounded-md">✍️ Établi par {book.established_by}</span>}
+                </div>
+              )}
+              {!book.publisher && !book.established_by && <div className="mb-2"></div>}
               
               <CopiesBadge book={book} />
               

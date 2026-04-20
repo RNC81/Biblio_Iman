@@ -31,7 +31,7 @@ git push origin main
 Les tables clés en PostgreSQL (Row Level Security Activé) :
 - **Table `books` :** L'inventaire central de la bibliothèque. 
   - 🛑 Attention au champ **`status`** (Type Texte restrictif ENUM: `AVAILABLE`, `ONLINE`, `BORROWED`) qui gère si le livre est sur étagère, numérique, ou prêté. (Au début du dev, c'était un booléen `is_available`, il a été DÉTRUIT. Base-toi uniquement sur `status`).
-  - Champs vitaux : `title`, `author`, `isbn`, `language`, `published_date`, `online_url`, `synopsis`, `private_note`.
+  - Champs vitaux : `title`, `author`, `publisher` (Maison d'édition), `established_by` (Établi par), `isbn`, `language`, `published_date`, `online_url`, `synopsis`, `private_note`.
   - Image cover : `cover_url`
   - **`collection_id`** (FK → `collections`) : Associe un livre à une collection/série multi-volumes (optionnel).
   - **`volume_number`** (integer) : Numéro du volume dans la collection (optionnel).

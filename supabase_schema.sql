@@ -23,6 +23,8 @@ CREATE TABLE public.books (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   title text NOT NULL,
   author text NOT NULL,
+  publisher text,
+  established_by text,
   isbn text,
   synopsis text,
   cover_url text,

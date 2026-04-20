@@ -36,7 +36,8 @@ export default function Admin() {
   const [bookData, setBookData] = useState({ 
     title: '', author: '', synopsis: '', cover_url: '', 
     status: 'AVAILABLE', private_note: '', 
-    language: 'Français', published_date: '', online_url: '' 
+    language: 'Français', published_date: '', online_url: '',
+    publisher: '', established_by: ''
   })
   
   const [locationText, setLocationText] = useState('')
@@ -71,6 +72,13 @@ export default function Admin() {
   const [showCollectionManager, setShowCollectionManager] = useState(false)
   const [newCollectionName, setNewCollectionName] = useState('')
   const [newCollectionDesc, setNewCollectionDesc] = useState('')
+
+  // === LANGUES DYNAMIQUES ===
+  const [showNewLangInput, setShowNewLangInput] = useState(false)
+  const [newLanguage, setNewLanguage] = useState('')
+  const languesDeBase = ["Français", "Arabe", "Persan", "Anglais", "Multi-langues"]
+  const extractedLangues = [...new Set(allBooks.map(b => b.language).filter(Boolean))]
+  const availableLanguages = [...new Set([...languesDeBase, ...extractedLangues])].sort()
 
   // === EXEMPLAIRES (Copies) ===
   const [bookCopies, setBookCopies] = useState([])  // Copies pour le livre en cours d'édition
@@ -256,6 +264,7 @@ export default function Admin() {
           ...bookData,
           title: book.title || '',
           author: book.author_name ? book.author_name.join(', ') : '',
+          publisher: book.publisher ? book.publisher.join(', ') : '',
           cover_url: book.cover_i ? `https://covers.openlibrary.org/b/id/${book.cover_i}-L.jpg` : '',
           published_date: book.first_publish_year ? book.first_publish_year.toString() : ''
         })
@@ -331,8 +340,10 @@ export default function Admin() {
         private_note: bookData.private_note || null, 
         location_id: finalLocationId,
         status: bookData.status,
-        language: bookData.language,
+        language: showNewLangInput && newLanguage.trim() ? newLanguage.trim() : bookData.language,
         published_date: bookData.published_date,
+        publisher: bookData.publisher || null,
+        established_by: bookData.established_by || null,
         online_url: bookData.online_url || null,
         cover_url: finalCoverUrl,
         collection_id: selectedCollectionId || null,
@@ -378,8 +389,11 @@ export default function Admin() {
     setBookData({ 
       title: '', author: '', synopsis: '', cover_url: '', 
       status: 'AVAILABLE', private_note: '', 
-      language: 'Français', published_date: '', online_url: '' 
+      language: 'Français', published_date: '', online_url: '',
+      publisher: '', established_by: ''
     })
+    setNewLanguage('')
+    setShowNewLangInput(false)
     setIsbn('')
     setLocationText('')
     setCoverFile(null)
@@ -418,8 +432,12 @@ export default function Admin() {
       private_note: book.private_note || '',
       language: book.language || 'Français',
       published_date: book.published_date || '',
+      publisher: book.publisher || '',
+      established_by: book.established_by || '',
       online_url: book.online_url || ''
     })
+    setNewLanguage('')
+    setShowNewLangInput(false)
 
     // Charger les exemplaires
     fetchCopiesForBook(book.id)
@@ -548,6 +566,11 @@ export default function Admin() {
                     <Input value={bookData.title} onChange={e => setBookData({...bookData, title: e.target.value})} placeholder="(Obligatoire)" className="bg-white font-bold text-slate-900 border-slate-300" />
                   </div>
                   <Input value={bookData.author} onChange={e => setBookData({...bookData, author: e.target.value})} placeholder="Auteur complet" className="bg-slate-50 border-slate-300 font-medium" />
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <Input value={bookData.publisher} onChange={e => setBookData({...bookData, publisher: e.target.value})} placeholder="Maison d'édition" className="bg-slate-50 border-slate-300 font-medium text-xs h-9" />
+                    <Input value={bookData.established_by} onChange={e => setBookData({...bookData, established_by: e.target.value})} placeholder="Établi par" className="bg-slate-50 border-slate-300 font-medium text-xs h-9" />
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200 shadow-inner">
@@ -557,17 +580,44 @@ export default function Admin() {
                   </div>
                   <div className="space-y-1">
                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Langue</label>
-                     <select 
-                       className="flex h-9 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
-                       value={bookData.language}
-                       onChange={e => setBookData({...bookData, language: e.target.value})}
-                     >
-                       <option value="Français">Français</option>
-                       <option value="Arabe">Arabe</option>
-                       <option value="Anglais">Anglais</option>
-                       <option value="Persan">Persan</option>
-                       <option value="Multi-langues">Multi-langues</option>
-                     </select>
+                     {!showNewLangInput ? (
+                       <select 
+                         className="flex h-9 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+                         value={availableLanguages.includes(bookData.language) ? bookData.language : (bookData.language ? 'AUTRE' : 'Français')}
+                         onChange={e => {
+                           if (e.target.value === 'AUTRE') {
+                             setShowNewLangInput(true)
+                           } else {
+                             setBookData({...bookData, language: e.target.value})
+                           }
+                         }}
+                       >
+                         {availableLanguages.map(lang => (
+                           <option key={lang} value={lang}>{lang}</option>
+                         ))}
+                         <option value="AUTRE" className="font-bold text-indigo-600">Autre (Ajouter une langue)...</option>
+                       </select>
+                     ) : (
+                       <div className="flex gap-2">
+                         <Input 
+                           autoFocus
+                           placeholder="Entrez la langue..." 
+                           value={newLanguage} 
+                           onChange={e => setNewLanguage(e.target.value)} 
+                           className="bg-white text-xs h-9 border-slate-500 ring-2 ring-indigo-200" 
+                         />
+                         <Button 
+                           variant="outline" 
+                           onClick={() => {
+                             setShowNewLangInput(false)
+                             setNewLanguage('')
+                           }}
+                           className="h-9 px-3 text-xs border-slate-300"
+                         >
+                           Annuler
+                         </Button>
+                       </div>
+                     )}
                   </div>
                 </div>
 
