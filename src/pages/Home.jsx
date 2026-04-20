@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { supabase } from '@/lib/supabase'
 import { useDebounce } from '@/hooks/useDebounce'
@@ -10,6 +11,7 @@ export default function Home() {
   const [books, setBooks] = useState([])
   const [filteredBooks, setFilteredBooks] = useState([])
   const [searchTerm, setSearchTerm] = useState('')
+  const [selectedBookModal, setSelectedBookModal] = useState(null)
   const [loading, setLoading] = useState(true)
   
   // States des filtres de la barre latérale 
@@ -145,6 +147,7 @@ export default function Home() {
 
   // Effectuer une redirection fluide vers un autre livre
   const handleRedirectToBook = (targetTitle) => {
+    setSelectedBookModal(null)
     setSelectedCollection(null)
     setSelectedLanguage(null)
     setSelectedStatus(null)
@@ -178,7 +181,10 @@ export default function Home() {
   }
 
   const BookCard = ({ book }) => (
-    <Card className="group overflow-hidden border border-slate-200 shadow-sm hover:shadow-xl transition-all duration-300 bg-white rounded-3xl flex flex-col hover:-translate-y-1">
+    <Card 
+      onClick={() => setSelectedBookModal(book)}
+      className="group cursor-pointer overflow-hidden border border-slate-200 shadow-sm hover:shadow-xl transition-all duration-300 bg-white rounded-3xl flex flex-col hover:-translate-y-1"
+    >
        
        {/* IMAGE COUVERTURE */}
        <div className="h-60 bg-slate-50 flex items-center justify-center overflow-hidden relative border-b border-black/5">
@@ -236,7 +242,7 @@ export default function Home() {
                     {originalBook && (
                        <Button 
                          variant="outline" 
-                         onClick={() => handleRedirectToBook(originalBook.title)}
+                         onClick={(e) => { e.stopPropagation(); handleRedirectToBook(originalBook.title); }}
                          className="w-full justify-start h-8 px-3 text-[10px] font-bold border-pink-200 text-pink-700 bg-pink-50 hover:bg-pink-100 hover:text-pink-800 uppercase tracking-wide"
                        >
                          🔗 Voir l'original ({originalBook.language || 'Autre'})
@@ -246,7 +252,7 @@ export default function Home() {
                        <Button 
                          key={tr.id}
                          variant="outline" 
-                         onClick={() => handleRedirectToBook(tr.title)}
+                         onClick={(e) => { e.stopPropagation(); handleRedirectToBook(tr.title); }}
                          className="w-full justify-start h-8 px-3 text-[10px] font-bold border-indigo-200 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 hover:text-indigo-800 uppercase tracking-wide"
                        >
                          🔗 Voir traduction en {tr.language || 'Autre'}
@@ -273,7 +279,7 @@ export default function Home() {
                   ) : <div></div>}
 
                   {book.status === 'ONLINE' && book.online_url && (
-                     <a href={book.online_url} target="_blank" rel="noreferrer">
+                     <a href={book.online_url} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}>
                        <Button className="h-10 px-6 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md hover:shadow-lg transition-all">Consulter ↗</Button>
                      </a>
                   )}
@@ -518,6 +524,132 @@ export default function Home() {
             )}
         </div>
       </div>
+
+      <Dialog open={!!selectedBookModal} onOpenChange={(open) => !open && setSelectedBookModal(null)}>
+        <DialogContent className="max-w-[90vw] w-[1000px] p-0 overflow-hidden bg-white gap-0 border-none rounded-3xl shadow-2xl">
+          {selectedBookModal && (
+            <div className="flex flex-col md:flex-row h-[85vh] max-h-[800px] w-full">
+               {/* SIDEBAR IMAGE */}
+               <div className="md:w-1/3 bg-slate-100 flex flex-col pt-10 p-6 items-center shrink-0 border-r border-slate-200 overflow-y-auto">
+                 {selectedBookModal.cover_url ? (
+                     <img src={selectedBookModal.cover_url} alt={selectedBookModal.title} className="w-56 rounded-xl shadow-2xl" />
+                  ) : (
+                     <div className="w-56 h-72 bg-slate-200 rounded-xl shadow-inner flex items-center justify-center">
+                       <span className="text-6xl grayscale">📓</span>
+                     </div>
+                  )}
+                  <div className="mt-8 w-full space-y-4">
+                     <div className="flex justify-center w-full">
+                       <StatusOverlay status={selectedBookModal.status} />
+                     </div>
+                     {selectedBookModal.status === 'ONLINE' && selectedBookModal.online_url && (
+                        <a href={selectedBookModal.online_url} target="_blank" rel="noreferrer" className="block w-full">
+                          <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold h-12 rounded-xl shadow-md uppercase tracking-wider text-xs">Consulter en Ligne ↗</Button>
+                        </a>
+                     )}
+                     {selectedBookModal.locations && (
+                        <div className="flex items-center justify-center bg-white rounded-xl p-4 border border-slate-200 shadow-[0_2px_10px_rgba(0,0,0,0.03)] w-full">
+                          <span className="text-2xl mr-3">📍</span>
+                          <div className="text-left w-full">
+                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Localisation / Étagère</p>
+                             <p className="text-base font-black text-slate-800 uppercase">{selectedBookModal.locations.shelf}</p>
+                          </div>
+                        </div>
+                     )}
+                  </div>
+               </div>
+               
+               {/* MAIN CONTENT */}
+               <div className="md:w-2/3 p-8 md:p-10 flex flex-col justify-between overflow-y-auto bg-white">
+                  <div>
+                     <DialogHeader className="text-left space-y-3 mb-6">
+                       <div className="flex flex-wrap gap-2 mb-1">
+                          {selectedBookModal.language && <Badge variant="outline" className="font-bold text-slate-500 border-slate-300 bg-white">{selectedBookModal.language}</Badge>}
+                          {selectedBookModal.published_date && <Badge variant="secondary" className="font-bold bg-slate-100 text-slate-700">Publié en {selectedBookModal.published_date}</Badge>}
+                          {selectedBookModal.isbn && <Badge variant="secondary" className="font-mono font-bold bg-slate-50 text-slate-500 border border-slate-200">ISBN {selectedBookModal.isbn}</Badge>}
+                       </div>
+                       
+                       {selectedBookModal.collections && (
+                         <p className="text-xs font-black text-violet-600 uppercase tracking-widest flex items-center bg-violet-50 w-fit px-3 py-1 rounded-full">
+                           📁 {selectedBookModal.collections.name} {selectedBookModal.volume_number && <span className="ml-1 opacity-70"> / Volume {selectedBookModal.volume_number}</span>}
+                         </p>
+                       )}
+                       
+                       <DialogTitle className="text-3xl md:text-4xl font-black text-slate-900 leading-tight tracking-tight mt-2">{selectedBookModal.title}</DialogTitle>
+                       <p className="text-xl font-bold text-indigo-600">{selectedBookModal.author || "Auteur inconnu"}</p>
+                     </DialogHeader>
+                     
+                     {/* INFOS ADDITIONNELLES */}
+                     {(selectedBookModal.publisher || selectedBookModal.established_by || selectedBookModal.translator) && (
+                       <div className="grid grid-cols-2 gap-4 mb-8 p-5 bg-slate-50/80 rounded-2xl border border-slate-100">
+                          {selectedBookModal.publisher && <div><p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Maison d'Édition</p><p className="text-sm font-bold text-slate-800">🏢 {selectedBookModal.publisher}</p></div>}
+                          {selectedBookModal.established_by && <div><p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Établi par</p><p className="text-sm font-bold text-slate-800">✍️ {selectedBookModal.established_by}</p></div>}
+                          {selectedBookModal.translator && <div className="col-span-2 mt-2 pt-2 border-t border-slate-200/60"><p className="text-[10px] font-black text-pink-500 uppercase tracking-wider mb-1">Traducteur (Traduction)</p><p className="text-sm font-bold text-pink-700">🌍 {selectedBookModal.translator}</p></div>}
+                       </div>
+                     )}
+                     
+                     {/* LIENS / TRADUCTIONS */}
+                     {(() => {
+                        const origBook = selectedBookModal.original_book_id ? books.find(b => b.id === selectedBookModal.original_book_id) : null;
+                        const availTranslations = books.filter(b => b.original_book_id === selectedBookModal.id);
+                        if (origBook || availTranslations.length > 0) {
+                          return (
+                             <div className="space-y-3 mb-8">
+                                {origBook && (
+                                   <Button variant="outline" onClick={() => handleRedirectToBook(origBook.title)} className="w-full justify-start h-12 border-pink-200 text-pink-700 bg-pink-50 hover:bg-pink-100 font-black uppercase tracking-wide rounded-xl">
+                                     🔗 Voir l'oeuvre originale ({origBook.language || 'Autre'})
+                                   </Button>
+                                )}
+                                {availTranslations.map(tr => (
+                                   <Button key={tr.id} variant="outline" onClick={() => handleRedirectToBook(tr.title)} className="w-full justify-start h-12 border-indigo-200 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 font-black uppercase tracking-wide rounded-xl">
+                                     🔗 Voir traduction en {tr.language || 'Autre'}
+                                   </Button>
+                                ))}
+                             </div>
+                          )
+                        }
+                        return null;
+                     })()}
+
+                     <div className="mb-8">
+                       <p className="text-[12px] font-black text-slate-900 uppercase tracking-widest mb-3 flex items-center gap-2">
+                         <span className="w-4 h-1 bg-indigo-600 rounded-full"></span> À Propos (Synopsis)
+                       </p>
+                       <div className="text-slate-700 font-medium text-[15px] leading-relaxed whitespace-pre-wrap bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+                         {selectedBookModal.synopsis || "Ce livre ne possède pas encore de résumé complet enregistré."}
+                       </div>
+                     </div>
+                  </div>
+                  
+                  <div className="mt-8 pt-8 border-t border-slate-200">
+                     {(() => {
+                       const summary = getCopiesSummary(selectedBookModal);
+                       if (summary) {
+                         return (
+                           <div className={`flex items-center justify-between p-4 rounded-2xl border mb-5 shadow-sm ${summary.available > 0 ? 'bg-teal-50 border-teal-200' : 'bg-slate-50 border-slate-200'}`}>
+                             <div className="flex items-center gap-4">
+                               <span className="text-3xl">{summary.available > 0 ? '📦' : '❌'}</span>
+                               <div>
+                                 <p className={`text-[11px] font-black uppercase tracking-widest ${summary.available > 0 ? 'text-teal-700' : 'text-slate-500'}`}>Équipement Manuel • {summary.total} Exemplaires</p>
+                                 <p className={`text-base font-black ${summary.available > 0 ? 'text-teal-900' : 'text-slate-700'}`}>{summary.available} Disponibles à l'emprunt</p>
+                               </div>
+                             </div>
+                           </div>
+                         )
+                       }
+                     })()}
+                     
+                     <div className="flex flex-wrap gap-2">
+                        {selectedBookModal.book_categories && selectedBookModal.book_categories.map(bc => (
+                           <Badge key={bc.categories?.id} variant="secondary" className="bg-slate-100 text-slate-700 cursor-default text-xs font-bold px-4 py-1.5 border border-slate-200 rounded-lg">{bc.categories?.name}</Badge>
+                        ))}
+                     </div>
+                  </div>
+               </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
