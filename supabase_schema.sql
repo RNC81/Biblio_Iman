@@ -26,6 +26,7 @@ CREATE TABLE public.books (
   publisher text,
   established_by text,
   translator text,
+  original_title text,
   isbn text,
   synopsis text,
   cover_url text,

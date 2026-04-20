@@ -37,7 +37,7 @@ export default function Admin() {
     title: '', author: '', synopsis: '', cover_url: '', 
     status: 'AVAILABLE', private_note: '', 
     language: 'Français', published_date: '', online_url: '',
-    publisher: '', established_by: '', translator: ''
+    publisher: '', established_by: '', translator: '', original_title: ''
   })
   
   const [inventorySearch, setInventorySearch] = useState('')
@@ -351,6 +351,7 @@ export default function Admin() {
         publisher: bookData.publisher || null,
         established_by: bookData.established_by || null,
         translator: bookData.translator || null,
+        original_title: bookData.original_title || null,
         online_url: bookData.online_url || null,
         cover_url: finalCoverUrl,
         collection_id: selectedCollectionId || null,
@@ -398,7 +399,7 @@ export default function Admin() {
       title: '', author: '', synopsis: '', cover_url: '', 
       status: 'AVAILABLE', private_note: '', 
       language: 'Français', published_date: '', online_url: '',
-      publisher: '', established_by: '', translator: ''
+      publisher: '', established_by: '', translator: '', original_title: ''
     })
     setNewLanguage('')
     setShowNewLangInput(false)
@@ -448,6 +449,7 @@ export default function Admin() {
       publisher: book.publisher || '',
       established_by: book.established_by || '',
       translator: book.translator || '',
+      original_title: book.original_title || '',
       online_url: book.online_url || ''
     })
     setNewLanguage('')
@@ -657,19 +659,29 @@ export default function Admin() {
                       <Input 
                         value={bookData.translator} 
                         onChange={e => setBookData({...bookData, translator: e.target.value})} 
-                        placeholder="Nom du traducteur" 
+                        placeholder="Nom du traducteur / de la traductrice" 
                         className="bg-white border-pink-200 text-xs h-9" 
                       />
-                      <select 
-                        value={selectedOriginalBookId} 
-                        onChange={e => setSelectedOriginalBookId(e.target.value)}
-                        className="w-full text-xs h-9 bg-white border border-pink-200 rounded-md font-semibold text-slate-700 p-2 cursor-pointer outline-none focus:ring-2 focus:ring-pink-300"
-                      >
-                        <option value="">-- Sélectionner l'oeuvre originale --</option>
-                        {allBooks.filter(b => b.id !== editingId).map(b => (
-                          <option key={b.id} value={b.id}>{b.title} {b.author ? `(${b.author})` : ''}</option>
-                        ))}
-                      </select>
+                      <div className="flex items-center gap-2">
+                        <select 
+                          value={selectedOriginalBookId} 
+                          onChange={e => setSelectedOriginalBookId(e.target.value)}
+                          className="w-full text-xs h-9 bg-white border border-pink-200 rounded-md font-semibold text-slate-700 p-2 cursor-pointer outline-none focus:ring-2 focus:ring-pink-300"
+                        >
+                          <option value="">-- Oeuvre originale dans le catalogue ? --</option>
+                          {allBooks.filter(b => b.id !== editingId).map(b => (
+                            <option key={b.id} value={b.id}>{b.title} {b.author ? `(${b.author})` : ''}</option>
+                          ))}
+                        </select>
+                      </div>
+                      {!selectedOriginalBookId && (
+                        <Input 
+                          value={bookData.original_title} 
+                          onChange={e => setBookData({...bookData, original_title: e.target.value})} 
+                          placeholder="Ou entrez le titre original (si non possédé)..." 
+                          className="bg-white border-pink-200 text-xs h-9" 
+                        />
+                      )}
                     </div>
                   )}
                 </div>

@@ -232,14 +232,14 @@ export default function Home() {
                 const originalBook = book.original_book_id ? books.find(b => b.id === book.original_book_id) : null;
                 const availableTranslations = books.filter(b => b.original_book_id === book.id);
                 
-                if (!originalBook && availableTranslations.length === 0 && !book.translator) return null;
+                if (!originalBook && availableTranslations.length === 0 && !book.translator && !book.original_title) return null;
                 
                 return (
                   <div className="space-y-2 mt-4 pt-3 border-t border-slate-100/60">
                     {book.translator && (
                        <p className="text-[11px] font-bold text-pink-600/80 mb-1">Traduit par : <span className="text-pink-600">{book.translator}</span></p>
                     )}
-                    {originalBook && (
+                    {originalBook ? (
                        <Button 
                          variant="outline" 
                          onClick={(e) => { e.stopPropagation(); handleRedirectToBook(originalBook.title); }}
@@ -247,7 +247,9 @@ export default function Home() {
                        >
                          🔗 Voir l'original ({originalBook.language || 'Autre'})
                        </Button>
-                    )}
+                    ) : book.original_title ? (
+                       <p className="text-[11px] font-bold text-slate-500 mb-1">Titre original : <span className="text-slate-700 italic">{book.original_title}</span></p>
+                    ) : null}
                     {availableTranslations.length > 0 && availableTranslations.map(tr => (
                        <Button 
                          key={tr.id}
@@ -592,14 +594,18 @@ export default function Home() {
                      {(() => {
                         const origBook = selectedBookModal.original_book_id ? books.find(b => b.id === selectedBookModal.original_book_id) : null;
                         const availTranslations = books.filter(b => b.original_book_id === selectedBookModal.id);
-                        if (origBook || availTranslations.length > 0) {
+                        if (origBook || availTranslations.length > 0 || selectedBookModal.original_title) {
                           return (
                              <div className="space-y-3 mb-8">
-                                {origBook && (
+                                {origBook ? (
                                    <Button variant="outline" onClick={() => handleRedirectToBook(origBook.title)} className="w-full justify-start h-12 border-pink-200 text-pink-700 bg-pink-50 hover:bg-pink-100 font-black uppercase tracking-wide rounded-xl">
                                      🔗 Voir l'oeuvre originale ({origBook.language || 'Autre'})
                                    </Button>
-                                )}
+                                ) : selectedBookModal.original_title ? (
+                                   <div className="w-full flex items-center h-12 px-4 border border-slate-200 text-slate-600 bg-slate-50 font-black uppercase tracking-wide rounded-xl text-sm">
+                                     Titre Original : <span className="ml-2 text-slate-800">{selectedBookModal.original_title}</span>
+                                   </div>
+                                ) : null}
                                 {availTranslations.map(tr => (
                                    <Button key={tr.id} variant="outline" onClick={() => handleRedirectToBook(tr.title)} className="w-full justify-start h-12 border-indigo-200 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 font-black uppercase tracking-wide rounded-xl">
                                      🔗 Voir traduction en {tr.language || 'Autre'}
