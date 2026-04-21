@@ -37,10 +37,15 @@ export default function Admin() {
     title: '', author: '', synopsis: '', cover_url: '', 
     status: 'AVAILABLE', private_note: '', 
     language: 'Français', published_date: '', online_url: '',
-    publisher: '', established_by: '', translator: '', original_title: ''
+    publisher: '', established_by: '', translator: '', original_title: '', transliterated_title: ''
   })
   
   const [inventorySearch, setInventorySearch] = useState('')
+  const [invFilterLang, setInvFilterLang] = useState('')
+  const [invFilterStatus, setInvFilterStatus] = useState('')
+  const [invFilterAuthor, setInvFilterAuthor] = useState('')
+  const [invFilterCat, setInvFilterCat] = useState('')
+  const [invFilterCollection, setInvFilterCollection] = useState('')
   
   const [locationText, setLocationText] = useState('')
   const [coverFile, setCoverFile] = useState(null)
@@ -66,6 +71,8 @@ export default function Admin() {
   const [showCatManager, setShowCatManager] = useState(false)
   const [newCatName, setNewCatName] = useState('')
   const [newCatParentId, setNewCatParentId] = useState('')
+  const [editingCatId, setEditingCatId] = useState(null)
+  const [editCatName, setEditCatName] = useState('')
 
   // === COLLECTIONS ===
   const [dbCollections, setDbCollections] = useState([])
@@ -74,6 +81,8 @@ export default function Admin() {
   const [showCollectionManager, setShowCollectionManager] = useState(false)
   const [newCollectionName, setNewCollectionName] = useState('')
   const [newCollectionDesc, setNewCollectionDesc] = useState('')
+  const [editingCollectionId, setEditingCollectionId] = useState(null)
+  const [editCollectionName, setEditCollectionName] = useState('')
 
   // === LANGUES DYNAMIQUES ===
   const [showNewLangInput, setShowNewLangInput] = useState(false)
@@ -352,6 +361,7 @@ export default function Admin() {
         established_by: bookData.established_by || null,
         translator: bookData.translator || null,
         original_title: bookData.original_title || null,
+        transliterated_title: bookData.transliterated_title || null,
         online_url: bookData.online_url || null,
         cover_url: finalCoverUrl,
         collection_id: selectedCollectionId || null,
@@ -399,7 +409,7 @@ export default function Admin() {
       title: '', author: '', synopsis: '', cover_url: '', 
       status: 'AVAILABLE', private_note: '', 
       language: 'Français', published_date: '', online_url: '',
-      publisher: '', established_by: '', translator: '', original_title: ''
+      publisher: '', established_by: '', translator: '', original_title: '', transliterated_title: ''
     })
     setNewLanguage('')
     setShowNewLangInput(false)
@@ -450,6 +460,7 @@ export default function Admin() {
       established_by: book.established_by || '',
       translator: book.translator || '',
       original_title: book.original_title || '',
+      transliterated_title: book.transliterated_title || '',
       online_url: book.online_url || ''
     })
     setNewLanguage('')
@@ -581,6 +592,7 @@ export default function Admin() {
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Titre de l'ouvrage</label>
                     <Input value={bookData.title} onChange={e => setBookData({...bookData, title: e.target.value})} placeholder="(Obligatoire)" className="bg-white font-bold text-slate-900 border-slate-300" />
                   </div>
+                  <Input value={bookData.transliterated_title} onChange={e => setBookData({...bookData, transliterated_title: e.target.value})} placeholder="Titre translittéré (Phonétique - Optionnel)" className="bg-slate-50 border-slate-200 text-slate-500 font-medium italic text-xs h-9" />
                   <Input value={bookData.author} onChange={e => setBookData({...bookData, author: e.target.value})} placeholder="Auteur complet" className="bg-slate-50 border-slate-300 font-medium" />
                   
                   <div className="grid grid-cols-2 gap-3">
@@ -779,12 +791,25 @@ export default function Admin() {
                             <p className="text-[11px] text-slate-400 p-2">Aucune collection créée pour le moment.</p>
                           ) : (
                             dbCollections.map(col => (
-                              <div key={col.id} className="flex justify-between items-center bg-violet-50 border border-violet-200 rounded-lg p-2.5">
-                                <div>
-                                  <span className="text-sm font-bold text-slate-700">{col.name}</span>
-                                  {col.description && <p className="text-[10px] text-slate-500 mt-0.5">{col.description}</p>}
-                                </div>
-                                <Button onClick={() => setCollectionToDelete(col)} variant="ghost" className="h-6 px-2 text-rose-500 hover:bg-rose-100 hover:text-rose-700 text-xs">Supprimer</Button>
+                              <div key={col.id} className="flex flex-col bg-violet-50 border border-violet-200 rounded-lg p-2.5">
+                                {editingCollectionId === col.id ? (
+                                   <div className="flex justify-between items-center gap-2">
+                                     <Input value={editCollectionName} onChange={e => setEditCollectionName(e.target.value)} className="h-8 text-xs bg-white" />
+                                     <Button onClick={() => handleUpdateCollection(col.id)} size="sm" className="h-8 px-2 bg-emerald-600 text-white text-[10px]">✔</Button>
+                                     <Button onClick={() => setEditingCollectionId(null)} variant="ghost" size="sm" className="h-8 px-2 text-[10px]">✖</Button>
+                                   </div>
+                                ) : (
+                                   <div className="flex justify-between items-center">
+                                     <div>
+                                       <span className="text-sm font-bold text-slate-700">{col.name}</span>
+                                       {col.description && <p className="text-[10px] text-slate-500 mt-0.5">{col.description}</p>}
+                                     </div>
+                                     <div className="flex gap-1">
+                                       <Button onClick={() => {setEditingCollectionId(col.id); setEditCollectionName(col.name);}} variant="ghost" className="h-6 px-2 text-indigo-600 hover:bg-indigo-100 align-middle text-xs transition-colors">✏️</Button>
+                                       <Button onClick={() => setCollectionToDelete(col)} variant="ghost" className="h-6 px-2 text-rose-500 hover:bg-rose-100 hover:text-rose-700 text-xs">Supprimer</Button>
+                                     </div>
+                                   </div>
+                                )}
                               </div>
                             ))
                           )}
@@ -860,15 +885,39 @@ export default function Admin() {
                             <div className="space-y-2 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
                                {dbCategories.filter(c=>!c.parent_id).map(parent => (
                                  <div key={parent.id} className="bg-slate-50 border border-slate-200 rounded p-2 space-y-1">
-                                    <div className="flex justify-between items-center text-sm font-bold text-slate-700">
-                                       <span>{parent.name}</span>
-                                       <Button onClick={()=>setCatToDelete(parent)} variant="ghost" className="h-6 px-2 text-rose-500 hover:bg-rose-100 hover:text-rose-700 text-xs">Supprimer</Button>
-                                    </div>
+                                    {editingCatId === parent.id ? (
+                                      <div className="flex justify-between items-center gap-2 mb-1">
+                                         <Input value={editCatName} onChange={e => setEditCatName(e.target.value)} className="h-7 text-xs bg-white" />
+                                         <Button onClick={() => handleUpdateCategory(parent.id)} size="sm" className="h-7 px-2 bg-emerald-600 text-white text-[10px]">✔</Button>
+                                         <Button onClick={() => setEditingCatId(null)} variant="ghost" size="sm" className="h-7 px-2 text-[10px]">✖</Button>
+                                      </div>
+                                    ) : (
+                                      <div className="flex justify-between items-center text-sm font-bold text-slate-700">
+                                         <span>{parent.name}</span>
+                                         <div className="flex gap-1">
+                                            <Button onClick={() => {setEditingCatId(parent.id); setEditCatName(parent.name);}} variant="ghost" className="h-6 px-2 text-indigo-600 hover:bg-indigo-100 align-middle text-xs transition-colors">✏️</Button>
+                                            <Button onClick={()=>setCatToDelete(parent)} variant="ghost" className="h-6 px-2 text-rose-500 hover:bg-rose-100 hover:text-rose-700 text-xs">Supprimer</Button>
+                                         </div>
+                                      </div>
+                                    )}
                                     <div className="pl-3 space-y-1 mt-1 border-l-2 border-slate-200">
                                        {dbCategories.filter(c=>c.parent_id === parent.id).map(child => (
-                                         <div key={child.id} className="flex justify-between items-center text-sm text-slate-600">
-                                            <span><span className="opacity-40 mr-1 text-xs">↳</span>{child.name}</span>
-                                            <Button onClick={()=>setCatToDelete(child)} variant="ghost" className="h-6 px-2 text-rose-500 hover:bg-rose-100 text-xs">Supprimer</Button>
+                                         <div key={child.id} className="w-full">
+                                           {editingCatId === child.id ? (
+                                              <div className="flex justify-between items-center gap-2 mb-1">
+                                                <Input value={editCatName} onChange={e => setEditCatName(e.target.value)} className="h-7 text-xs bg-white" />
+                                                <Button onClick={() => handleUpdateCategory(child.id)} size="sm" className="h-7 px-2 bg-emerald-600 text-white text-[10px]">✔</Button>
+                                                <Button onClick={() => setEditingCatId(null)} variant="ghost" size="sm" className="h-7 px-2 text-[10px]">✖</Button>
+                                              </div>
+                                           ) : (
+                                              <div className="flex justify-between items-center text-sm text-slate-600">
+                                                 <span><span className="opacity-40 mr-1 text-xs">↳</span>{child.name}</span>
+                                                 <div className="flex gap-1">
+                                                   <Button onClick={() => {setEditingCatId(child.id); setEditCatName(child.name);}} variant="ghost" className="h-6 px-2 text-indigo-600 hover:bg-indigo-100 align-middle text-xs transition-colors">✏️</Button>
+                                                   <Button onClick={()=>setCatToDelete(child)} variant="ghost" className="h-6 px-2 text-rose-500 hover:bg-rose-100 text-xs">Supprimer</Button>
+                                                 </div>
+                                              </div>
+                                           )}
                                          </div>
                                        ))}
                                     </div>
@@ -1006,7 +1055,7 @@ export default function Admin() {
                 <span className="mr-3">Votre Catalogue</span> 
                 <Badge variant="secondary" className="bg-slate-100 text-slate-700 text-sm shadow-inner">{allBooks.length}</Badge>
               </h2>
-              <Button onClick={fetchInventory} variant="ghost" size="sm" className="bg-white text-xs font-semibold text-slate-500 border border-slate-200 hover:text-slate-800 shadow-sm">Actualiser</Button>
+              <Button onClick={() => { setInventorySearch(''); setInvFilterLang(''); setInvFilterStatus(''); setInvFilterCat(''); setInvFilterAuthor(''); setInvFilterCollection(''); fetchInventory(); }} variant="ghost" size="sm" className="bg-white text-xs font-semibold text-slate-500 border border-slate-200 hover:text-slate-800 shadow-sm">Actualiser / Reset</Button>
             </div>
             <Input 
               placeholder="Rechercher par titre, auteur ou ISBN..." 
@@ -1014,6 +1063,31 @@ export default function Admin() {
               onChange={e => setInventorySearch(e.target.value)} 
               className="bg-white shadow-sm border-slate-200" 
             />
+            {/* Filtres avancés admin */}
+            <div className="flex flex-wrap gap-2">
+              <select value={invFilterStatus} onChange={e => setInvFilterStatus(e.target.value)} className="bg-white border-slate-200 text-xs rounded-md px-2 py-1.5 shadow-sm text-slate-600 outline-none">
+                <option value="">Tous les formats</option>
+                <option value="AVAILABLE">Sur Étagère</option>
+                <option value="ONLINE">Format Numérique</option>
+                <option value="BORROWED">Emprunté</option>
+              </select>
+              <select value={invFilterLang} onChange={e => setInvFilterLang(e.target.value)} className="bg-white border-slate-200 text-xs rounded-md px-2 py-1.5 shadow-sm text-slate-600 outline-none">
+                <option value="">Toutes les langues</option>
+                {availableLanguages.map(l => <option key={l} value={l}>{l}</option>)}
+              </select>
+              <select value={invFilterCollection} onChange={e => setInvFilterCollection(e.target.value)} className="bg-white border-slate-200 text-xs rounded-md px-2 py-1.5 shadow-sm text-slate-600 outline-none">
+                <option value="">Toutes les collections</option>
+                {dbCollections.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+              </select>
+              <select value={invFilterAuthor} onChange={e => setInvFilterAuthor(e.target.value)} className="bg-white border-slate-200 text-xs rounded-md px-2 py-1.5 shadow-sm text-slate-600 outline-none">
+                <option value="">Tous les auteurs</option>
+                {[...new Set(allBooks.map(b => b.author).filter(Boolean))].sort().map(a => <option key={a} value={a}>{a}</option>)}
+              </select>
+              <select value={invFilterCat} onChange={e => setInvFilterCat(e.target.value)} className="bg-white border-slate-200 text-xs rounded-md px-2 py-1.5 shadow-sm text-slate-600 outline-none max-w-[150px] truncate">
+                <option value="">Toutes les catégories</option>
+                {dbCategories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+              </select>
+            </div>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3">
@@ -1025,11 +1099,29 @@ export default function Admin() {
                </div>
             ) : (
               allBooks.filter(b => {
-                if(!inventorySearch) return true;
-                const q = inventorySearch.toLowerCase();
-                return (b.title && b.title.toLowerCase().includes(q)) || 
-                       (b.author && b.author.toLowerCase().includes(q)) || 
-                       (b.isbn && b.isbn.toLowerCase().includes(q));
+                let match = true;
+                
+                // Text search
+                if(inventorySearch) {
+                  const q = inventorySearch.toLowerCase();
+                  const t1 = b.title?.toLowerCase() || '';
+                  const t2 = b.transliterated_title?.toLowerCase() || '';
+                  const a = b.author?.toLowerCase() || '';
+                  const i = b.isbn?.toLowerCase() || '';
+                  if (!t1.includes(q) && !t2.includes(q) && !a.includes(q) && !i.includes(q)) match = false;
+                }
+                
+                // Advanced Filters
+                if (invFilterStatus && b.status !== invFilterStatus) match = false;
+                if (invFilterLang && b.language !== invFilterLang) match = false;
+                if (invFilterAuthor && b.author !== invFilterAuthor) match = false;
+                if (invFilterCollection && b.collections?.name !== invFilterCollection) match = false;
+                if (invFilterCat) {
+                   const hasCat = b.book_categories?.some(bc => bc.categories?.name === invFilterCat);
+                   if(!hasCat) match = false;
+                }
+                
+                return match;
               }).map(book => {
                 const copiesSummary = getCopiesSummary(book)
                 return (

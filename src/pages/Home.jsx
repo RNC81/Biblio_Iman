@@ -213,6 +213,7 @@ export default function Home() {
                  {book.language && <Badge variant="outline" className="font-bold text-slate-500 border-slate-200 px-2 py-0.5">{book.language}</Badge>}
               </div>
               <h2 className="text-xl font-bold text-slate-900 line-clamp-2 leading-tight mb-1 group-hover:text-indigo-600 transition-colors" title={book.title}>{book.title}</h2>
+              {book.transliterated_title && <p className="text-xs font-bold text-slate-500 italic mb-1.5 line-clamp-1">{book.transliterated_title}</p>}
               <p className="text-sm font-semibold text-indigo-600 mb-1.5">{book.author || "Auteur inconnu"}</p>
               
               {(book.publisher || book.established_by) && (
@@ -578,6 +579,9 @@ export default function Home() {
                        )}
                        
                        <DialogTitle className="text-3xl md:text-4xl font-black text-slate-900 leading-tight tracking-tight mt-2">{selectedBookModal.title}</DialogTitle>
+                       {selectedBookModal.transliterated_title && (
+                         <p className="text-lg md:text-xl font-bold text-slate-500 italic leading-snug">{selectedBookModal.transliterated_title}</p>
+                       )}
                        <p className="text-xl font-bold text-indigo-600">{selectedBookModal.author || "Auteur inconnu"}</p>
                      </DialogHeader>
                      
