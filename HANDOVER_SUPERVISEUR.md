@@ -57,5 +57,11 @@ L'institut et le client cherchent un système lisible, sérieux et non "technolo
 4. **La SideBar des Filtres Publics :** Le fichier `Home.jsx` est la "Vitrine". Il possède un solide moteur de recherche hybride (La barre de texte aspire les titres, auteurs, mais AUSSI le synopsis) combinée à une barre de filtre e-commerce latérale. Prends toujours soin de ne pas casser le hook d'anti-spam `useDebounce`.
 
 ---
+## 🛡️ Sécurité et Conformité Réglementaire (À venir)
 
-**→ Fin des Instructions.** Tu as le contexte opérationnel. Le client poursuivra la suite (Gestion potentielle des comptes adhérents, Emprunts, Génération d'impression QR) ! 
+Le projet grandissant, la sécurité devient un pilier central. Lors de l'implémentation future du "Système des Membres / Emprunteurs", le système devra OBLIGATOIREMENT respecter les normes suivantes :
+- **RGPD (GDPR) :** Chiffrement des données personnelles (noms, emails, numéros de téléphone des étudiants). Mise en place d'un droit à l'oubli et d'une durée de rétention claire pour l'historique d'emprunt.
+- **ISO 27001 :** Gestion stricte des rôles et des accès (RBAC - Role Based Access Control). Les logs d'administration devront potentiellement être audités (qui a supprimé quel livre et quand).
+- **NIS 2 :** Sécurisation de la base de données Supabase, MFA (Multi-Factor Authentication) pour l'accès Administrateur, et garantie de disponibilité du catalogue.
+
+**→ Fin des Instructions.** Tu as le contexte opérationnel. Le client poursuivra la suite !
