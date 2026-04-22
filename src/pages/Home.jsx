@@ -21,10 +21,14 @@ export default function Home() {
   const [selectedAuthor, setSelectedAuthor] = useState(null)
   const [selectedCollection, setSelectedCollection] = useState(null)
   
-  // State pour ouvrir/fermer les dossiers de collection
   const [openCollections, setOpenCollections] = useState({})
   
   const debouncedSearchTerm = useDebounce(searchTerm, 300)
+
+  const stripArabicDiacritics = (str) => {
+    if (!str) return '';
+    return str.replace(/[\u064B-\u065F\u0670]/g, '');
+  }
 
   useEffect(() => {
     fetchBooks()
@@ -50,15 +54,17 @@ export default function Home() {
 
     // 1. Recherche Textuelle Globale (Titre, Auteur, Synopsis, ISBN)
     if (debouncedSearchTerm) {
-      const q = debouncedSearchTerm.toLowerCase();
+      const q = stripArabicDiacritics(debouncedSearchTerm.toLowerCase());
       const motsCles = q.split(/[\s-]+/).filter(i => i)
       
       result = result.filter(b => {
-         const t = b.title ? b.title.toLowerCase() : ''
-         const a = b.author ? b.author.toLowerCase() : ''
+         const t1 = stripArabicDiacritics(b.title ? b.title.toLowerCase() : '')
+         const t2 = stripArabicDiacritics(b.transliterated_title ? b.transliterated_title.toLowerCase() : '')
+         const a1 = stripArabicDiacritics(b.author ? b.author.toLowerCase() : '')
+         const a2 = stripArabicDiacritics(b.transliterated_author ? b.transliterated_author.toLowerCase() : '')
          const i = b.isbn ? b.isbn : ''
-         const s = b.synopsis ? b.synopsis.toLowerCase() : '' // Recherche étendue au résumé
-         const texteComplet = `${t} ${a} ${i} ${s}`
+         const s = stripArabicDiacritics(b.synopsis ? b.synopsis.toLowerCase() : '') // Recherche étendue au résumé
+         const texteComplet = `${t1} ${t2} ${a1} ${a2} ${i} ${s}`
          
          return motsCles.every(mot => texteComplet.includes(mot))
       })
@@ -214,7 +220,10 @@ export default function Home() {
               </div>
               <h2 className="text-xl font-bold text-slate-900 line-clamp-2 leading-tight mb-1 group-hover:text-indigo-600 transition-colors" title={book.title}>{book.title}</h2>
               {book.transliterated_title && <p className="text-xs font-bold text-slate-500 italic mb-1.5 line-clamp-1">{book.transliterated_title}</p>}
-              <p className="text-sm font-semibold text-indigo-600 mb-1.5">{book.author || "Auteur inconnu"}</p>
+              <p className="text-sm font-semibold text-indigo-600 mb-1.5">
+                {book.author || "Auteur inconnu"}
+                {book.transliterated_author && <span className="text-xs font-normal text-slate-500 italic ml-2">({book.transliterated_author})</span>}
+              </p>
               
               {(book.publisher || book.established_by) && (
                 <div className="flex flex-wrap gap-2 text-[10px] font-bold text-slate-500 mb-3 uppercase tracking-wider">
@@ -369,7 +378,7 @@ export default function Home() {
             MENU DES FILTRES À GAUCHE
             ========================================= */}
         <div className="w-full md:w-64 lg:w-72 shrink-0 space-y-6">
-           <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200/60 sticky top-24">
+           <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200/60 sticky top-24 max-h-[calc(100vh-120px)] overflow-y-auto custom-scrollbar">
               <h3 className="font-extrabold text-slate-800 text-xl mb-6 tracking-tight">Affiner la recherche</h3>
               
               {/* Disponibilité */}
@@ -582,7 +591,10 @@ export default function Home() {
                        {selectedBookModal.transliterated_title && (
                          <p className="text-lg md:text-xl font-bold text-slate-500 italic leading-snug">{selectedBookModal.transliterated_title}</p>
                        )}
-                       <p className="text-xl font-bold text-indigo-600">{selectedBookModal.author || "Auteur inconnu"}</p>
+                       <p className="text-xl font-bold text-indigo-600">
+                          {selectedBookModal.author || "Auteur inconnu"}
+                          {selectedBookModal.transliterated_author && <span className="text-base font-normal text-slate-500 italic ml-2">({selectedBookModal.transliterated_author})</span>}
+                       </p>
                      </DialogHeader>
                      
                      {/* INFOS ADDITIONNELLES */}

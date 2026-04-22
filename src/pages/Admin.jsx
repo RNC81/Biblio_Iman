@@ -30,6 +30,11 @@ const COPY_STATUSES = [
   { value: 'LOST', label: 'Perdu', color: 'bg-rose-600 text-white' },
 ]
 
+const stripArabicDiacritics = (str) => {
+  if (!str) return '';
+  return str.replace(/[\u064B-\u065F\u0670]/g, '');
+}
+
 export default function Admin() {
   const [isbn, setIsbn] = useState('')
   const [loading, setLoading] = useState(false)
@@ -37,7 +42,7 @@ export default function Admin() {
     title: '', author: '', synopsis: '', cover_url: '', 
     status: 'AVAILABLE', private_note: '', 
     language: 'Français', published_date: '', online_url: '',
-    publisher: '', established_by: '', translator: '', original_title: '', transliterated_title: ''
+    publisher: '', established_by: '', translator: '', original_title: '', transliterated_title: '', transliterated_author: ''
   })
   
   const [inventorySearch, setInventorySearch] = useState('')
@@ -46,6 +51,7 @@ export default function Admin() {
   const [invFilterAuthor, setInvFilterAuthor] = useState('')
   const [invFilterCat, setInvFilterCat] = useState('')
   const [invFilterCollection, setInvFilterCollection] = useState('')
+  const [invSortBy, setInvSortBy] = useState('date_desc')
   
   const [locationText, setLocationText] = useState('')
   const [coverFile, setCoverFile] = useState(null)
@@ -362,6 +368,7 @@ export default function Admin() {
         translator: bookData.translator || null,
         original_title: bookData.original_title || null,
         transliterated_title: bookData.transliterated_title || null,
+        transliterated_author: bookData.transliterated_author || null,
         online_url: bookData.online_url || null,
         cover_url: finalCoverUrl,
         collection_id: selectedCollectionId || null,
@@ -409,7 +416,7 @@ export default function Admin() {
       title: '', author: '', synopsis: '', cover_url: '', 
       status: 'AVAILABLE', private_note: '', 
       language: 'Français', published_date: '', online_url: '',
-      publisher: '', established_by: '', translator: '', original_title: '', transliterated_title: ''
+      publisher: '', established_by: '', translator: '', original_title: '', transliterated_title: '', transliterated_author: ''
     })
     setNewLanguage('')
     setShowNewLangInput(false)
@@ -461,6 +468,7 @@ export default function Admin() {
       translator: book.translator || '',
       original_title: book.original_title || '',
       transliterated_title: book.transliterated_title || '',
+      transliterated_author: book.transliterated_author || '',
       online_url: book.online_url || ''
     })
     setNewLanguage('')
@@ -594,6 +602,7 @@ export default function Admin() {
                   </div>
                   <Input value={bookData.transliterated_title} onChange={e => setBookData({...bookData, transliterated_title: e.target.value})} placeholder="Titre translittéré (Phonétique - Optionnel)" className="bg-slate-50 border-slate-200 text-slate-500 font-medium italic text-xs h-9" />
                   <Input value={bookData.author} onChange={e => setBookData({...bookData, author: e.target.value})} placeholder="Auteur complet" className="bg-slate-50 border-slate-300 font-medium" />
+                  <Input value={bookData.transliterated_author} onChange={e => setBookData({...bookData, transliterated_author: e.target.value})} placeholder="Auteur translittéré (Phonétique - Optionnel)" className="bg-slate-50 border-slate-200 text-slate-500 font-medium italic text-xs h-9" />
                   
                   <div className="grid grid-cols-2 gap-3">
                     <Input value={bookData.publisher} onChange={e => setBookData({...bookData, publisher: e.target.value})} placeholder="Maison d'édition" className="bg-slate-50 border-slate-300 font-medium text-xs h-9" />
@@ -1055,7 +1064,7 @@ export default function Admin() {
                 <span className="mr-3">Votre Catalogue</span> 
                 <Badge variant="secondary" className="bg-slate-100 text-slate-700 text-sm shadow-inner">{allBooks.length}</Badge>
               </h2>
-              <Button onClick={() => { setInventorySearch(''); setInvFilterLang(''); setInvFilterStatus(''); setInvFilterCat(''); setInvFilterAuthor(''); setInvFilterCollection(''); fetchInventory(); }} variant="ghost" size="sm" className="bg-white text-xs font-semibold text-slate-500 border border-slate-200 hover:text-slate-800 shadow-sm">Actualiser / Reset</Button>
+              <Button onClick={() => { setInventorySearch(''); setInvFilterLang(''); setInvFilterStatus(''); setInvFilterCat(''); setInvFilterAuthor(''); setInvFilterCollection(''); setInvSortBy('date_desc'); fetchInventory(); }} variant="ghost" size="sm" className="bg-white text-xs font-semibold text-slate-500 border border-slate-200 hover:text-slate-800 shadow-sm">Actualiser / Reset</Button>
             </div>
             <Input 
               placeholder="Rechercher par titre, auteur ou ISBN..." 
@@ -1087,6 +1096,12 @@ export default function Admin() {
                 <option value="">Toutes les catégories</option>
                 {dbCategories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
               </select>
+              <select value={invSortBy} onChange={e => setInvSortBy(e.target.value)} className="bg-white border-indigo-300 text-xs rounded-md px-2 py-1.5 shadow-sm text-indigo-700 font-bold outline-none ml-auto">
+                <option value="date_desc">Trier par: Plus récents</option>
+                <option value="date_asc">Trier par: Plus anciens</option>
+                <option value="title_asc">Trier par: Titre (A-Z)</option>
+                <option value="author_asc">Trier par: Auteur (A-Z)</option>
+              </select>
             </div>
           </div>
 
@@ -1103,12 +1118,13 @@ export default function Admin() {
                 
                 // Text search
                 if(inventorySearch) {
-                  const q = inventorySearch.toLowerCase();
-                  const t1 = b.title?.toLowerCase() || '';
-                  const t2 = b.transliterated_title?.toLowerCase() || '';
-                  const a = b.author?.toLowerCase() || '';
-                  const i = b.isbn?.toLowerCase() || '';
-                  if (!t1.includes(q) && !t2.includes(q) && !a.includes(q) && !i.includes(q)) match = false;
+                  const q = stripArabicDiacritics(inventorySearch.toLowerCase());
+                  const t1 = stripArabicDiacritics(b.title?.toLowerCase() || '');
+                  const t2 = stripArabicDiacritics(b.transliterated_title?.toLowerCase() || '');
+                  const a1 = stripArabicDiacritics(b.author?.toLowerCase() || '');
+                  const a2 = stripArabicDiacritics(b.transliterated_author?.toLowerCase() || '');
+                  const i = stripArabicDiacritics(b.isbn?.toLowerCase() || '');
+                  if (!t1.includes(q) && !t2.includes(q) && !a1.includes(q) && !a2.includes(q) && !i.includes(q)) match = false;
                 }
                 
                 // Advanced Filters
@@ -1122,6 +1138,12 @@ export default function Admin() {
                 }
                 
                 return match;
+              }).sort((a, b) => {
+                if (invSortBy === 'date_desc') return new Date(b.created_at) - new Date(a.created_at);
+                if (invSortBy === 'date_asc') return new Date(a.created_at) - new Date(b.created_at);
+                if (invSortBy === 'title_asc') return (a.title || '').localeCompare(b.title || '');
+                if (invSortBy === 'author_asc') return (a.author || '').localeCompare(b.author || '');
+                return 0;
               }).map(book => {
                 const copiesSummary = getCopiesSummary(book)
                 return (
