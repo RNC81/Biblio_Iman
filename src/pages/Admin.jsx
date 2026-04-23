@@ -1090,7 +1090,18 @@ export default function Admin() {
               </select>
               <select value={invFilterAuthor} onChange={e => setInvFilterAuthor(e.target.value)} className="bg-white border-slate-200 text-xs rounded-md px-2 py-1.5 shadow-sm text-slate-600 outline-none">
                 <option value="">Tous les auteurs</option>
-                {[...new Set(allBooks.map(b => b.author).filter(Boolean))].sort().map(a => <option key={a} value={a}>{a}</option>)}
+                {Object.values(
+                  allBooks.reduce((acc, b) => {
+                    if (b.author && !acc[b.author]) {
+                      acc[b.author] = { author: b.author, transliterated_author: b.transliterated_author || null }
+                    }
+                    return acc;
+                  }, {})
+                ).sort((a, b) => a.author.localeCompare(b.author)).map(({ author, transliterated_author }) => (
+                  <option key={author} value={author}>
+                    {author}{transliterated_author ? ` — ${transliterated_author}` : ''}
+                  </option>
+                ))}
               </select>
               <select value={invFilterCat} onChange={e => setInvFilterCat(e.target.value)} className="bg-white border-slate-200 text-xs rounded-md px-2 py-1.5 shadow-sm text-slate-600 outline-none max-w-[150px] truncate">
                 <option value="">Toutes les catégories</option>
