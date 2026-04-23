@@ -99,7 +99,15 @@ export default function Home() {
   const extractedLangues = [...new Set(books.map(b => b.language).filter(Boolean))]
   const availableLanguages = [...new Set([...languesDeBase, ...extractedLangues])].sort()
 
-  const availableAuthors = [...new Set(books.map(b => b.author).filter(Boolean))].sort()
+  // Auteurs disponibles avec leur translittération associée (dédoublonnés par nom)
+  const availableAuthors = Object.values(
+    books.reduce((acc, b) => {
+      if (b.author && !acc[b.author]) {
+        acc[b.author] = { author: b.author, transliterated_author: b.transliterated_author || null }
+      }
+      return acc;
+    }, {})
+  ).sort((a, b) => a.author.localeCompare(b.author))
   
   const allCatNames = []
   books.forEach(b => {
@@ -446,8 +454,10 @@ export default function Home() {
                      onChange={(e) => setSelectedAuthor(e.target.value || null)}
                   >
                      <option value="">Tous les auteurs</option>
-                     {availableAuthors.map(auth => (
-                         <option key={auth} value={auth}>{auth}</option>
+                     {availableAuthors.map(({ author, transliterated_author }) => (
+                         <option key={author} value={author}>
+                           {author}{transliterated_author ? ` — ${transliterated_author}` : ''}
+                         </option>
                      ))}
                   </select>
                 </div>
