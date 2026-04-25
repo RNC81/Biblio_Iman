@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { supabase } from '@/lib/supabase'
-import { getCoverUrl } from '@/lib/cloudinary'
+import { getCoverUrl, uploadToCloudinary } from '@/lib/cloudinary'
 
 // Fenêtre (Modal) de confirmation véritable et esthétique
 const ConfirmModal = ({ isOpen, title, message, onConfirm, onCancel }) => {
@@ -309,38 +309,11 @@ export default function Admin() {
     }
   }
 
-  // Compresse une image côté client avant envoi (réduit la bande passante Supabase de ~80%)
-  const compressImage = (file) => new Promise((resolve) => {
-    const reader = new FileReader()
-    reader.readAsDataURL(file)
-    reader.onload = (e) => {
-      const img = new Image()
-      img.src = e.target.result
-      img.onload = () => {
-        const canvas = document.createElement('canvas')
-        const MAX_SIZE = 800
-        let { width, height } = img
-        if (width > height && width > MAX_SIZE) {
-          height = Math.round(height * MAX_SIZE / width)
-          width = MAX_SIZE
-        } else if (height > MAX_SIZE) {
-          width = Math.round(width * MAX_SIZE / height)
-          height = MAX_SIZE
-        }
-        canvas.width = width
-        canvas.height = height
-        const ctx = canvas.getContext('2d')
-        ctx.drawImage(img, 0, 0, width, height)
-        canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.80)
-      }
-    }
-  })
-
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0]
-      if (file.size > 10 * 1024 * 1024) {
-        showToastMsg("L'image est trop volumineuse (Maximum 10 Mo).", "error")
+      if (file.size > 20 * 1024 * 1024) {
+        showToastMsg("L'image est trop volumineuse (Maximum 20 Mo).", "error")
         return;
       }
       setCoverFile(file)
@@ -348,26 +321,16 @@ export default function Admin() {
     }
   }
 
+  // Upload directement sur Cloudinary - Supabase Storage n'est plus utilisé
   const handleCoverUpload = async () => {
     if (!coverFile) return bookData.cover_url;
-
-    // Compression automatique avant envoi (~80% de réduction)
-    const compressed = await compressImage(coverFile)
-    const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.jpg`
-    const filePath = `public/${fileName}`
-
-    const { error: uploadError } = await supabase.storage.from('covers').upload(filePath, compressed, {
-      contentType: 'image/jpeg',
-      cacheControl: '31536000', // Cache 1 an côté Supabase CDN
-    })
-
-    if (uploadError) {
-      showToastMsg("Erreur lors de l'envoi de l'image.", "error")
+    try {
+      const cloudinaryUrl = await uploadToCloudinary(coverFile)
+      return cloudinaryUrl
+    } catch (err) {
+      showToastMsg("Erreur lors de l'envoi de l'image vers Cloudinary.", "error")
       return bookData.cover_url
     }
-
-    const { data } = supabase.storage.from('covers').getPublicUrl(filePath)
-    return data.publicUrl
   }
 
   const saveToDatabase = async () => {
