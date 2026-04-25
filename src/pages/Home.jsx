@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from "@/components/ui/button"
 import { supabase } from '@/lib/supabase'
 import { useDebounce } from '@/hooks/useDebounce'
+import { getCoverUrl } from '@/lib/cloudinary'
 
 export default function Home() {
   const [books, setBooks] = useState([])
@@ -203,7 +204,7 @@ export default function Home() {
        {/* IMAGE COUVERTURE */}
        <div className="h-60 bg-slate-50 flex items-center justify-center overflow-hidden relative border-b border-black/5">
            {book.cover_url ? (
-              <img src={book.cover_url} alt={book.title} loading="lazy" className="object-cover w-full h-full opacity-90 group-hover:scale-105 group-hover:opacity-100 transition-all duration-500" />
+              <img src={getCoverUrl(book.cover_url, 400)} alt={book.title} loading="lazy" className="object-cover w-full h-full opacity-90 group-hover:scale-105 group-hover:opacity-100 transition-all duration-500" />
             ) : (
               <div className="flex flex-col items-center opacity-30 group-hover:opacity-50 transition-opacity">
                 <span className="text-6xl mb-2 grayscale">📓</span>
@@ -336,7 +337,7 @@ export default function Home() {
             {/* Icône dossier / aperçu */}
             <div className={`w-16 h-20 rounded-xl flex items-center justify-center overflow-hidden flex-shrink-0 transition-all border ${isOpen ? 'border-violet-300 bg-violet-100' : 'border-slate-200 bg-slate-50'}`}>
               {previewCover ? (
-                <img src={previewCover} alt="" loading="lazy" className="object-cover w-full h-full rounded-xl opacity-80" />
+                <img src={getCoverUrl(previewCover, 200)} alt="" loading="lazy" className="object-cover w-full h-full rounded-xl opacity-80" />
               ) : (
                 <span className="text-3xl">📁</span>
               )}
@@ -554,7 +555,7 @@ export default function Home() {
                {/* SIDEBAR IMAGE */}
                <div className="md:w-1/3 bg-slate-100 flex flex-col pt-10 p-6 items-center shrink-0 border-r border-slate-200 overflow-y-auto">
                  {selectedBookModal.cover_url ? (
-                     <img src={selectedBookModal.cover_url} alt={selectedBookModal.title} loading="lazy" className="w-56 rounded-xl shadow-2xl" />
+                     <img src={getCoverUrl(selectedBookModal.cover_url, 600)} alt={selectedBookModal.title} loading="lazy" className="w-56 rounded-xl shadow-2xl" />
                   ) : (
                      <div className="w-56 h-72 bg-slate-200 rounded-xl shadow-inner flex items-center justify-center">
                        <span className="text-6xl grayscale">📓</span>
