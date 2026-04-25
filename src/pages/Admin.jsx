@@ -1193,7 +1193,7 @@ export default function Admin() {
                 <Card key={book.id} className="shadow-sm border border-slate-200 hover:shadow-md transition-all flex flex-col overflow-hidden bg-white">
                   <div className="h-40 w-full bg-slate-50 flex items-center justify-center relative border-b border-slate-100">
                     {book.cover_url ? (
-                      <img src={book.cover_url} alt={book.title} className="object-cover w-full h-full opacity-95" />
+                      <img src={book.cover_url} alt={book.title} loading="lazy" className="object-cover w-full h-full opacity-95" />
                     ) : (
                       <div className="flex flex-col items-center justify-center text-slate-300">
                         <span className="text-3xl mb-1">📘</span>
