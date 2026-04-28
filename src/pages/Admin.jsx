@@ -42,7 +42,7 @@ export default function Admin() {
   const [bookData, setBookData] = useState({ 
     title: '', author: '', synopsis: '', cover_url: '', 
     status: 'AVAILABLE', private_note: '', 
-    language: 'Français', published_date: '', online_url: '',
+    language: '', published_date: '', online_url: '',
     publisher: '', established_by: '', translator: '', original_title: '', transliterated_title: '', transliterated_author: ''
   })
   
@@ -335,6 +335,19 @@ export default function Admin() {
 
   const saveToDatabase = async () => {
     setLoading(true)
+    if (!bookData.title.trim()) {
+      showToastMsg("Veuillez entrer le titre de l'ouvrage.", "error")
+      setLoading(false)
+      return
+    }
+
+    const finalLanguage = showNewLangInput && newLanguage.trim() ? newLanguage.trim() : bookData.language;
+    if (!finalLanguage) {
+      showToastMsg("Veuillez sélectionner une langue.", "error")
+      setLoading(false)
+      return
+    }
+
     try {
       const finalCoverUrl = await handleCoverUpload()
 
@@ -357,7 +370,7 @@ export default function Admin() {
         private_note: bookData.private_note || null, 
         location_id: finalLocationId,
         status: bookData.status,
-        language: showNewLangInput && newLanguage.trim() ? newLanguage.trim() : bookData.language,
+        language: finalLanguage,
         published_date: bookData.published_date,
         publisher: bookData.publisher || null,
         established_by: bookData.established_by || null,
@@ -411,7 +424,7 @@ export default function Admin() {
     setBookData({ 
       title: '', author: '', synopsis: '', cover_url: '', 
       status: 'AVAILABLE', private_note: '', 
-      language: 'Français', published_date: '', online_url: '',
+      language: '', published_date: '', online_url: '',
       publisher: '', established_by: '', translator: '', original_title: '', transliterated_title: '', transliterated_author: ''
     })
     setNewLanguage('')
@@ -616,7 +629,7 @@ export default function Admin() {
                      {!showNewLangInput ? (
                        <select 
                          className="flex h-9 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
-                         value={availableLanguages.includes(bookData.language) ? bookData.language : (bookData.language ? 'AUTRE' : 'Français')}
+                         value={availableLanguages.includes(bookData.language) ? bookData.language : (bookData.language ? 'AUTRE' : '')}
                          onChange={e => {
                            if (e.target.value === 'AUTRE') {
                              setShowNewLangInput(true)
@@ -625,6 +638,7 @@ export default function Admin() {
                            }
                          }}
                        >
+                         <option value="" disabled>Sélectionner...</option>
                          {availableLanguages.map(lang => (
                            <option key={lang} value={lang}>{lang}</option>
                          ))}
@@ -1070,21 +1084,21 @@ export default function Admin() {
             />
             {/* Filtres avancés admin */}
             <div className="flex flex-wrap gap-2">
-              <select value={invFilterStatus} onChange={e => setInvFilterStatus(e.target.value)} className="bg-white border-slate-200 text-xs rounded-md px-2 py-1.5 shadow-sm text-slate-600 outline-none">
+              <select value={invFilterStatus} onChange={e => setInvFilterStatus(e.target.value)} className="bg-white border-slate-200 text-xs rounded-md px-2 py-1.5 shadow-sm text-slate-600 outline-none max-w-[130px] sm:max-w-[150px] truncate">
                 <option value="">Tous les formats</option>
                 <option value="AVAILABLE">Sur Étagère</option>
                 <option value="ONLINE">Format Numérique</option>
                 <option value="BORROWED">Emprunté</option>
               </select>
-              <select value={invFilterLang} onChange={e => setInvFilterLang(e.target.value)} className="bg-white border-slate-200 text-xs rounded-md px-2 py-1.5 shadow-sm text-slate-600 outline-none">
+              <select value={invFilterLang} onChange={e => setInvFilterLang(e.target.value)} className="bg-white border-slate-200 text-xs rounded-md px-2 py-1.5 shadow-sm text-slate-600 outline-none max-w-[130px] sm:max-w-[150px] truncate">
                 <option value="">Toutes les langues</option>
                 {availableLanguages.map(l => <option key={l} value={l}>{l}</option>)}
               </select>
-              <select value={invFilterCollection} onChange={e => setInvFilterCollection(e.target.value)} className="bg-white border-slate-200 text-xs rounded-md px-2 py-1.5 shadow-sm text-slate-600 outline-none">
-                <option value="">Toutes les collections</option>
+              <select value={invFilterCollection} onChange={e => setInvFilterCollection(e.target.value)} className="bg-white border-slate-200 text-xs rounded-md px-2 py-1.5 shadow-sm text-slate-600 outline-none max-w-[130px] sm:max-w-[150px] truncate">
+                <option value="">Toutes collections</option>
                 {dbCollections.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
               </select>
-              <select value={invFilterAuthor} onChange={e => setInvFilterAuthor(e.target.value)} className="bg-white border-slate-200 text-xs rounded-md px-2 py-1.5 shadow-sm text-slate-600 outline-none">
+              <select value={invFilterAuthor} onChange={e => setInvFilterAuthor(e.target.value)} className="bg-white border-slate-200 text-xs rounded-md px-2 py-1.5 shadow-sm text-slate-600 outline-none max-w-[130px] sm:max-w-[150px] truncate">
                 <option value="">Tous les auteurs</option>
                 {Object.values(
                   allBooks.reduce((acc, b) => {
@@ -1099,11 +1113,11 @@ export default function Admin() {
                   </option>
                 ))}
               </select>
-              <select value={invFilterCat} onChange={e => setInvFilterCat(e.target.value)} className="bg-white border-slate-200 text-xs rounded-md px-2 py-1.5 shadow-sm text-slate-600 outline-none max-w-[150px] truncate">
-                <option value="">Toutes les catégories</option>
+              <select value={invFilterCat} onChange={e => setInvFilterCat(e.target.value)} className="bg-white border-slate-200 text-xs rounded-md px-2 py-1.5 shadow-sm text-slate-600 outline-none max-w-[130px] sm:max-w-[150px] truncate">
+                <option value="">Toutes catégories</option>
                 {dbCategories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
               </select>
-              <select value={invSortBy} onChange={e => setInvSortBy(e.target.value)} className="bg-white border-indigo-300 text-xs rounded-md px-2 py-1.5 shadow-sm text-indigo-700 font-bold outline-none ml-auto">
+              <select value={invSortBy} onChange={e => setInvSortBy(e.target.value)} className="bg-white border-indigo-300 text-xs rounded-md px-2 py-1.5 shadow-sm text-indigo-700 font-bold outline-none max-w-[130px] sm:max-w-[200px] truncate ml-auto">
                 <option value="date_desc">Trier par: Plus récents</option>
                 <option value="date_asc">Trier par: Plus anciens</option>
                 <option value="title_asc">Trier par: Titre (A-Z)</option>
