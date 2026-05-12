@@ -1,0 +1,26 @@
+name: Supabase Keep-Alive
+
+on:
+  schedule:
+    # S'exécute à minuit (UTC) tous les 3 jours
+    - cron: '0 0 */3 * *'
+  workflow_dispatch: # Permet de lancer le script manuellement depuis GitHub
+
+jobs:
+  ping-supabase:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase API pour empêcher la mise en veille
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          echo "Pinging Supabase at $SUPABASE_URL"
+          RESPONSE_CODE=$(curl -s -o /dev/null -w "%{http_code}" -H "apikey: $SUPABASE_ANON_KEY" -H "Authorization: Bearer $SUPABASE_ANON_KEY" "$SUPABASE_URL/rest/v1/books?select=id&limit=1")
+          
+          if [ "$RESPONSE_CODE" -eq 200 ]; then
+            echo "Succès : La base de données Supabase a bien répondu (Code 200)."
+          else
+            echo "Erreur : La base de données Supabase n'a pas répondu correctement (Code $RESPONSE_CODE)."
+            exit 1
+          fi
